@@ -1,0 +1,31 @@
+# VideoSlides Configuration
+# This file defines the slide order, durations, and page ranges
+
+[settings]
+output_dir = "pngs"
+output_video = "presentation.mp4"
+resolution = [1920, 1080]
+fps = 1
+background_color = "black"
+pdf_threads = 4
+
+# Define slides in the order they should appear in the video
+# Each slide specifies:
+# - filename: PDF file to process
+# - duration: seconds to display each page
+# - pages: which pages to include ("all", "1", "1-3", "2,4-6", etc.)
+
+[[slides]]
+filename = "1 15.pdf"
+duration = 10
+pages = "all"
+
+[[slides]]
+filename = "2 15.pdf"
+duration = 15
+pages = "1-3"
+
+[[slides]]
+filename = "3 15.pdf"
+duration = 8
+pages = "all"
