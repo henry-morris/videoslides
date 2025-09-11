@@ -63,52 +63,34 @@ def pdfs_to_pngs(config, target_width=1920, target_height=1080):
         # Calculate PDF hash for caching
         pdf_hash = calculate_pdf_hash(pdf_file)
         pdf_cache_dir = cache_root / pdf_hash
+        pdf_temp_dir = cache_root / f"{pdf_hash}.tmp"
         
         # Check if we need to render pages
-        pages = None
-        total_pages = None
-        
         if pdf_cache_dir.exists():
-            # Try to get page count from existing cache
+            # Cache exists, get page count
             existing_pngs = list(pdf_cache_dir.glob("*.png"))
             if existing_pngs:
                 total_pages = max(int(p.stem) for p in existing_pngs)
                 print(f"📦 Found cache for '{filename}' (hash: {pdf_hash[:8]}...) with {total_pages} pages")
             else:
-                # Cache dir exists but no pages, need to render
-                pages = convert_from_path(pdf_file, fmt="png", thread_count=pdf_threads)
-                total_pages = len(pages)
-                print(f"🔄 Cache directory empty, rendering {total_pages} page(s)")
+                print(f"⚠️ Cache directory exists but empty for '{filename}'")
+                continue
         else:
-            # No cache, need to render
-            pdf_cache_dir.mkdir(exist_ok=True)
+            # No cache, need to render all pages
+            print(f"🆕 No cache found, rendering all pages for '{filename}' (hash: {pdf_hash[:8]}...)")
+            
+            # Create temporary directory
+            pdf_temp_dir.mkdir(exist_ok=True)
+            
+            # Convert all pages to temporary directory
             pages = convert_from_path(pdf_file, fmt="png", thread_count=pdf_threads)
             total_pages = len(pages)
-            print(f"🆕 No cache found, rendering {total_pages} page(s)")
+            print(f"🔄 Rendering all {total_pages} page(s)...")
 
-        # Parse which pages to include
-        page_numbers = parse_page_range(pages_spec, total_pages)
-        print(f"📋 Using pages: {page_numbers}")
-
-        for page_num in page_numbers:
-            if page_num > total_pages:
-                print(f"⚠️ Page {page_num} doesn't exist in {filename}, skipping")
-                continue
-
-            # Check if cached PNG exists (simplified filename)
-            cached_png = pdf_cache_dir / f"{page_num:03d}.png"
-            
-            if cached_png.exists():
-                print(f"💾 Using cached page {page_num}")
-            else:
-                print(f"🔧 Generating page {page_num}...")
-                # Generate and cache the page
-                if pages is None:
-                    # We had a cache hit for page count but this specific page wasn't cached
-                    pages = convert_from_path(pdf_file, fmt="png", thread_count=pdf_threads)
+            for page_idx, page in enumerate(pages, start=1):
+                print(f"🔧 Processing page {page_idx}/{total_pages}...")
                 
-                img = pages[page_num - 1]  # Convert to 0-based index
-                img = img.convert("RGB")
+                img = page.convert("RGB")
                 w, h = img.size
 
                 scale = min(target_width / w, target_height / h)
@@ -120,10 +102,29 @@ def pdfs_to_pngs(config, target_width=1920, target_height=1080):
                 top = (target_height - new_size[1]) // 2
                 background.paste(img, (left, top))
                 
-                # Save to cache with simple filename
-                background.save(cached_png, "PNG")
+                # Save to temporary directory
+                temp_png = pdf_temp_dir / f"{page_idx:03d}.png"
+                background.save(temp_png, "PNG")
 
-            print(f"✅ Page {page_num} ready")
+            # Atomically move temporary directory to final location
+            pdf_temp_dir.rename(pdf_cache_dir)
+            print(f"✅ Cache created for '{filename}' with {total_pages} pages")
+
+        # Parse which pages to include for this slide
+        page_numbers = parse_page_range(pages_spec, total_pages)
+        print(f"📋 Using pages: {page_numbers}")
+
+        # Verify all requested pages exist in cache
+        for page_num in page_numbers:
+            if page_num > total_pages:
+                print(f"⚠️ Page {page_num} doesn't exist in {filename}, skipping")
+                continue
+
+            cached_png = pdf_cache_dir / f"{page_num:03d}.png"
+            if not cached_png.exists():
+                print(f"⚠️ Page {page_num} missing from cache for '{filename}'")
+            else:
+                print(f"✅ Page {page_num} ready")
 
     print(f"\n🎬 PNG conversion complete! Slides saved in '{cache_root.resolve()}'")
 
