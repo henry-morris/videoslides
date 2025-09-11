@@ -30,11 +30,14 @@ uv pip install -e .
 # Run with default config.toml in current directory
 uv run videoslides
 
-# Use custom config file
+# Run in different directory (default: current directory)
+uv run videoslides /path/to/slides
+
+# Use custom config file (default: config.toml)
 uv run videoslides --config myconfig.toml
 
-# Run in different directory
-uv run videoslides --directory /path/to/slides
+# Combine directory and config
+uv run videoslides /path/to/slides --config myconfig.toml
 ```
 
 ### Configuration
@@ -86,9 +89,9 @@ pages = "2"
 
 #### Slides
 Each `[[slides]]` entry defines:
-- `filename`: PDF file to process
-- `duration`: Seconds to display each page from this PDF
-- `pages`: Which pages to include (see Page Range Syntax above)
+- `filename`: PDF file to process (required)
+- `duration`: Seconds to display each page from this PDF (default: 15)
+- `pages`: Which pages to include (default: "all") - see Page Range Syntax above
 
 ## How It Works
 
