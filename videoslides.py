@@ -40,7 +40,7 @@ def pdfs_to_pngs(config, target_width=1920, target_height=1080):
 
     for order, slide in enumerate(config["slides"], start=1):
         filename = slide["filename"]
-        duration = slide["duration"]
+        duration = slide.get("duration", 15)
         pages_spec = slide.get("pages", "all")
 
         pdf_file = Path(filename)
@@ -138,7 +138,7 @@ def load_config(config_file="config.toml"):
 def main():
     """Run the complete pipeline: PDFs → PNGs → MP4."""
     parser = argparse.ArgumentParser(description="Convert PDF presentations to video using TOML config")
-    parser.add_argument("--directory", "-d", default=".",
+    parser.add_argument("directory", nargs="?", default=".",
                        help="Directory to run in (default: current directory)")
     parser.add_argument("--config", "-c", default="config.toml",
                        help="Config file to use (default: config.toml)")
