@@ -30,7 +30,7 @@ def parse_page_range(pages_str, total_pages):
 
 def pdfs_to_pngs(config, target_width=1920, target_height=1080):
     """Convert PDF files to PNG images based on config."""
-    output_path = Path(config["settings"]["output_dir"])
+    output_path = Path(config["settings"].get("output_dir", "pngs"))
     output_path.mkdir(exist_ok=True)
 
     pdf_threads = config["settings"].get("pdf_threads", 4)
@@ -88,8 +88,8 @@ def pdfs_to_pngs(config, target_width=1920, target_height=1080):
 
 def pngs_to_mp4(config):
     """Convert PNG images to MP4 video."""
-    png_dir = config["settings"]["output_dir"]
-    output_filename = config["settings"]["output_video"]
+    png_dir = config["settings"].get("output_dir", "pngs")
+    output_filename = config["settings"].get("output_video", "presentation.mp4")
     fps = config["settings"].get("fps", 1)
 
     png_path = Path(png_dir)

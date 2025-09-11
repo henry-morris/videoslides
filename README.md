@@ -42,17 +42,19 @@ uv run videoslides /path/to/slides --config myconfig.toml
 
 ### Configuration
 
-Create a `config.toml` file to define your presentation:
+Create a `config.toml` file to define your presentation. The `[settings]` section is optional since all parameters have defaults:
 
 ```toml
+# Optional settings section - all values have defaults
 [settings]
-output_dir = "pngs"
-output_video = "presentation.mp4"
-resolution = [1920, 1080]
-fps = 1
-background_color = "black"
-pdf_threads = 4
+output_dir = "pngs"           # default
+output_video = "presentation.mp4"  # default
+resolution = [1920, 1080]    # default
+fps = 1                      # default
+background_color = "black"   # default
+pdf_threads = 4              # default
 
+# Minimal example - only slides are required
 [[slides]]
 filename = "intro.pdf"
 duration = 10
@@ -80,6 +82,7 @@ pages = "2"
 ### Configuration Options
 
 #### Settings
+All settings have default values and are optional:
 - `output_dir`: Directory for generated PNG files (default: "pngs")
 - `output_video`: Output video filename (default: "presentation.mp4")
 - `resolution`: Video resolution as [width, height] (default: [1920, 1080])
