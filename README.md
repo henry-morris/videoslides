@@ -47,7 +47,7 @@ Create a `config.toml` file to define your presentation. The `[settings]` sectio
 ```toml
 # Optional settings section - all values have defaults
 [settings]
-output_dir = "pngs"           # default
+output_cache = "output_cache/"  # default
 output_video = "presentation.mp4"  # default
 resolution = [1920, 1080]    # default
 fps = 1                      # default
@@ -83,7 +83,7 @@ pages = "2"
 
 #### Settings
 All settings have default values and are optional:
-- `output_dir`: Directory for generated PNG files (default: "pngs")
+- `output_cache`: Directory for generated PNG files (default: "output_cache/")
 - `output_video`: Output video filename (default: "presentation.mp4")
 - `resolution`: Video resolution as [width, height] (default: [1920, 1080])
 - `fps`: Video frame rate (default: 1)
