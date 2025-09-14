@@ -212,6 +212,11 @@ def pngs_to_video(config):
             print(f"🎞️ Adding page {page_num} ({duration}s)")
             clip = ImageClip(str(cached_png)).with_duration(duration)
 
+            # For long slides, note that keyframes will be added during encoding
+            if duration > 15:
+                keyframe_count = duration // 15 + 1  # Every 15s + end
+                print(f"🔑 Long slide detected - will add ~{keyframe_count} keyframes during encoding")
+
             # Add progress bar to this clip if requested
             if show_progress_bar:
                 print(f"🎯 Adding progress bar to page {page_num}...")
@@ -237,11 +242,25 @@ def pngs_to_video(config):
         print(f"🔧 Creating video with {len(clips)} slides...")
         final = concatenate_videoclips(clips, method="compose")
 
-        # Set codec based on format
+        # Set codec and keyframe interval based on format
+        # For keyframes every 15 seconds: keyint = fps * 15
+        keyframe_interval = fps * 15
+
         if output_format == "mkv":
-            final.write_videofile(output_filename, fps=fps, threads=None, codec='libx264')
+            final.write_videofile(
+                output_filename,
+                fps=fps,
+                threads=None,
+                codec='libx264',
+                ffmpeg_params=['-g', str(keyframe_interval), '-keyint_min', str(keyframe_interval)]
+            )
         else:
-            final.write_videofile(output_filename, fps=fps, threads=None)
+            final.write_videofile(
+                output_filename,
+                fps=fps,
+                threads=None,
+                ffmpeg_params=['-g', str(keyframe_interval), '-keyint_min', str(keyframe_interval)]
+            )
 
         print(f"✅ Video saved as '{output_filename}'")
     else:
