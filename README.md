@@ -49,6 +49,7 @@ Create a `config.toml` file to define your presentation. The `[settings]` sectio
 [settings]
 output_cache = "output_cache/"  # default
 output_video = "presentation.mp4"  # default
+output_format = "mp4"        # default, can be "mp4" or "mkv"
 resolution = [1920, 1080]    # default
 fps = 1                      # default
 background_color = "black"   # default
@@ -71,6 +72,19 @@ duration = 8
 pages = "2"
 ```
 
+#### MKV Format Example
+
+```toml
+[settings]
+output_format = "mkv"
+output_video = "my_presentation.mkv"
+
+[[slides]]
+filename = "slides.pdf"
+duration = 12
+pages = "all"
+```
+
 ### Page Range Syntax
 
 - `"all"` - Include all pages
@@ -84,7 +98,8 @@ pages = "2"
 #### Settings
 All settings have default values and are optional:
 - `output_cache`: Directory for generated PNG files (default: "output_cache/")
-- `output_video`: Output video filename (default: "presentation.mp4")
+- `output_video`: Output video filename (default: "presentation.mp4" or "presentation.mkv" based on format)
+- `output_format`: Video format - "mp4" or "mkv" (default: "mp4")
 - `resolution`: Video resolution as [width, height] (default: [1920, 1080])
 - `fps`: Video frame rate (default: 1)
 - `background_color`: Background color for letterboxing (default: "black")

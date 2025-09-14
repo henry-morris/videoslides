@@ -64,7 +64,7 @@ def pdfs_to_pngs(config, target_width=1920, target_height=1080):
         pdf_hash = calculate_pdf_hash(pdf_file)
         pdf_cache_dir = cache_root / pdf_hash
         pdf_temp_dir = cache_root / f"{pdf_hash}.tmp"
-        
+
         # Check if we need to render pages
         if pdf_cache_dir.exists():
             # Cache exists, get page count
@@ -78,10 +78,10 @@ def pdfs_to_pngs(config, target_width=1920, target_height=1080):
         else:
             # No cache, need to render all pages
             print(f"🆕 No cache found, rendering all pages for '{filename}' (hash: {pdf_hash[:8]}...)")
-            
+
             # Create temporary directory
             pdf_temp_dir.mkdir(exist_ok=True)
-            
+
             # Convert all pages to temporary directory
             pages = convert_from_path(pdf_file, fmt="png", thread_count=pdf_threads)
             total_pages = len(pages)
@@ -89,7 +89,7 @@ def pdfs_to_pngs(config, target_width=1920, target_height=1080):
 
             for page_idx, page in enumerate(pages, start=1):
                 print(f"🔧 Processing page {page_idx}/{total_pages}...")
-                
+
                 img = page.convert("RGB")
                 w, h = img.size
 
@@ -101,7 +101,7 @@ def pdfs_to_pngs(config, target_width=1920, target_height=1080):
                 left = (target_width - new_size[0]) // 2
                 top = (target_height - new_size[1]) // 2
                 background.paste(img, (left, top))
-                
+
                 # Save to temporary directory
                 temp_png = pdf_temp_dir / f"{page_idx:03d}.png"
                 background.save(temp_png, "PNG")
@@ -129,13 +129,18 @@ def pdfs_to_pngs(config, target_width=1920, target_height=1080):
     print(f"\n🎬 PNG conversion complete! Slides saved in '{cache_root.resolve()}'")
 
 
-def pngs_to_mp4(config):
-    """Convert PNG images to MP4 video."""
+def pngs_to_video(config):
+    """Convert PNG images to video (MP4 or MKV)."""
     cache_root = Path(config["settings"].get("output_cache", "output_cache/"))
-    output_filename = config["settings"].get("output_video", "presentation.mp4")
+    output_format = config["settings"].get("output_format", "mp4").lower()
+
+    # Set default filename based on format
+    default_filename = f"presentation.{output_format}"
+    output_filename = config["settings"].get("output_video", default_filename)
+
     fps = config["settings"].get("fps", 1)
 
-    print("🎥 Starting PNG → MP4 conversion...")
+    print(f"🎥 Starting PNG → {output_format.upper()} conversion...")
 
     clips = []
     for order, slide in enumerate(config["slides"], start=1):
@@ -165,14 +170,14 @@ def pngs_to_mp4(config):
             continue
 
         total_pages = max(int(p.stem) for p in existing_pngs)
-        
+
         # Parse which pages to include
         page_numbers = parse_page_range(pages_spec, total_pages)
         print(f"📋 Using pages: {page_numbers}")
 
         for page_num in page_numbers:
             cached_png = pdf_cache_dir / f"{page_num:03d}.png"
-            
+
             if not cached_png.exists():
                 print(f"⚠️ Page {page_num} not found in cache for '{filename}', skipping")
                 continue
@@ -184,7 +189,13 @@ def pngs_to_mp4(config):
     if clips:
         print(f"🔧 Creating video with {len(clips)} slides...")
         final = concatenate_videoclips(clips, method="compose")
-        final.write_videofile(output_filename, fps=fps, threads=None)
+
+        # Set codec based on format
+        if output_format == "mkv":
+            final.write_videofile(output_filename, fps=fps, threads=None, codec='libx264')
+        else:
+            final.write_videofile(output_filename, fps=fps, threads=None)
+
         print(f"✅ Video saved as '{output_filename}'")
     else:
         print("⚠️ No valid PNG images found")
@@ -202,7 +213,7 @@ def load_config(config_file="config.toml"):
 
 
 def main():
-    """Run the complete pipeline: PDFs → PNGs → MP4."""
+    """Run the complete pipeline: PDFs → PNGs → Video."""
     parser = argparse.ArgumentParser(description="Convert PDF presentations to video using TOML config")
     parser.add_argument("directory", nargs="?", default=".",
                        help="Directory to run in (default: current directory)")
@@ -226,8 +237,8 @@ def main():
         resolution = config["settings"].get("resolution", [1920, 1080])
         pdfs_to_pngs(config, target_width=resolution[0], target_height=resolution[1])
 
-        # Stage 2: Convert PNGs to MP4
-        pngs_to_mp4(config)
+        # Stage 2: Convert PNGs to video
+        pngs_to_video(config)
 
         print("\n🎬 VideoSlides pipeline complete!")
 
