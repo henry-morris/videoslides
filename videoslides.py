@@ -9,7 +9,8 @@ import argparse
 import os
 import tomllib
 import hashlib
-from moviepy import ImageClip, concatenate_videoclips
+from moviepy import ImageClip, concatenate_videoclips, ColorClip, CompositeVideoClip, VideoClip
+from PIL import ImageDraw
 
 
 def calculate_pdf_hash(pdf_path):
@@ -19,6 +20,26 @@ def calculate_pdf_hash(pdf_path):
         for chunk in iter(lambda: f.read(4096), b""):
             sha256_hash.update(chunk)
     return sha256_hash.hexdigest()
+
+
+def create_progress_bar_clip(width, height, duration, progress_color="white", bar_height=10):
+    """Create a progress bar clip that fills from left to right over the duration."""
+    import numpy as np
+
+    def make_frame(t):
+        # Calculate progress width (0 to full width)
+        progress = min(t / duration, 1.0)
+        progress_width = int(width * progress)
+
+        if progress_width == 0:
+            # Return empty frame if no progress yet
+            return np.zeros((bar_height, 1, 3), dtype=np.uint8)
+
+        # Create image only as wide as the progress
+        img = Image.new("RGB", (progress_width, bar_height), progress_color)
+        return np.array(img)
+
+    return VideoClip(make_frame, duration=duration)
 
 
 def parse_page_range(pages_str, total_pages):
@@ -139,6 +160,7 @@ def pngs_to_video(config):
     output_filename = config["settings"].get("output_video", default_filename)
 
     fps = config["settings"].get("fps", 1)
+    resolution = config["settings"].get("resolution", [1920, 1080])
 
     print(f"🎥 Starting PNG → {output_format.upper()} conversion...")
 
@@ -175,6 +197,11 @@ def pngs_to_video(config):
         page_numbers = parse_page_range(pages_spec, total_pages)
         print(f"📋 Using pages: {page_numbers}")
 
+        # Check if this slide should have a progress bar
+        show_progress_bar = slide.get("show_progress_bar", False)
+        progress_bar_color = slide.get("progress_bar_color", "white")
+        progress_bar_height = slide.get("progress_bar_height", 10)
+
         for page_num in page_numbers:
             cached_png = pdf_cache_dir / f"{page_num:03d}.png"
 
@@ -184,6 +211,26 @@ def pngs_to_video(config):
 
             print(f"🎞️ Adding page {page_num} ({duration}s)")
             clip = ImageClip(str(cached_png)).with_duration(duration)
+
+            # Add progress bar to this clip if requested
+            if show_progress_bar:
+                print(f"🎯 Adding progress bar to page {page_num}...")
+
+                # Create progress bar for this clip
+                progress_bar = create_progress_bar_clip(
+                    width=resolution[0],
+                    height=resolution[1],
+                    duration=duration,
+                    progress_color=progress_bar_color,
+                    bar_height=progress_bar_height
+                )
+
+                # Position progress bar at bottom left of screen
+                progress_bar = progress_bar.with_position((0, resolution[1] - progress_bar_height - 20))
+
+                # Composite slide with progress bar
+                clip = CompositeVideoClip([clip, progress_bar])
+
             clips.append(clip)
 
     if clips:

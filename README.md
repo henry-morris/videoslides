@@ -85,6 +85,34 @@ duration = 12
 pages = "all"
 ```
 
+#### Progress Bar Example
+
+You can add progress bars to individual slides to show progress through each page's duration:
+
+```toml
+[[slides]]
+filename = "intro.pdf"
+duration = 10
+pages = "all"
+# No progress bar on this slide
+
+[[slides]]
+filename = "main_presentation.pdf"
+duration = 30
+pages = "1-5"
+show_progress_bar = true
+progress_bar_color = "red"
+progress_bar_height = 8
+
+[[slides]]
+filename = "conclusion.pdf"
+duration = 15
+pages = "all"
+show_progress_bar = true
+progress_bar_color = "blue"
+# Uses default height of 10 pixels
+```
+
 ### Page Range Syntax
 
 - `"all"` - Include all pages
@@ -110,6 +138,9 @@ Each `[[slides]]` entry defines:
 - `filename`: PDF file to process (required)
 - `duration`: Seconds to display each page from this PDF (default: 15)
 - `pages`: Which pages to include (default: "all") - see Page Range Syntax above
+- `show_progress_bar`: Show progress bar at bottom for this slide (default: false)
+- `progress_bar_color`: Color of the progress bar (default: "white")
+- `progress_bar_height`: Height of the progress bar in pixels (default: 10)
 
 ## How It Works
 
