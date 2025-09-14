@@ -199,8 +199,8 @@ def pngs_to_video(config):
 
         # Check if this slide should have a progress bar
         show_progress_bar = slide.get("show_progress_bar", False)
-        progress_bar_color = slide.get("progress_bar_color", "white")
-        progress_bar_height = slide.get("progress_bar_height", 10)
+        progress_bar_color = slide.get("progress_bar_color", "#1f4305")
+        progress_bar_height = slide.get("progress_bar_height", 16)
 
         for page_num in page_numbers:
             cached_png = pdf_cache_dir / f"{page_num:03d}.png"

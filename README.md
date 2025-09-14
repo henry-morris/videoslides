@@ -139,8 +139,8 @@ Each `[[slides]]` entry defines:
 - `duration`: Seconds to display each page from this PDF (default: 15)
 - `pages`: Which pages to include (default: "all") - see Page Range Syntax above
 - `show_progress_bar`: Show progress bar at bottom for this slide (default: false)
-- `progress_bar_color`: Color of the progress bar (default: "white")
-- `progress_bar_height`: Height of the progress bar in pixels (default: 10)
+- `progress_bar_color`: Color of the progress bar (default: Land Talks dark green)
+- `progress_bar_height`: Height of the progress bar in pixels (default: 16)
 
 ## How It Works
 
