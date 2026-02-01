@@ -47,7 +47,7 @@ Create a `config.toml` file to define your presentation. The `[settings]` sectio
 ```toml
 # Optional settings section - all values have defaults
 [settings]
-output_cache = "output_cache/"  # default
+output_cache = "~/.cache/videoslides"  # default
 output_video = "presentation.mp4"  # default
 output_format = "mp4"        # default, can be "mp4" or "mkv"
 resolution = [1920, 1080]    # default
@@ -126,7 +126,7 @@ progress_bar_color = "blue"
 
 #### Settings
 All settings have default values and are optional:
-- `output_cache`: Directory for generated PNG files (default: "output_cache/")
+- `output_cache`: Directory for cached PNG files (default: "~/.cache/videoslides")
 - `output_video`: Output video filename (default: "presentation.mp4" or "presentation.mkv" based on format)
 - `output_format`: Video format - "mp4" or "mkv" (default: "mp4")
 - `resolution`: Video resolution as [width, height] (default: [1920, 1080])

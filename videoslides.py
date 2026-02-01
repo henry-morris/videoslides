@@ -61,8 +61,9 @@ def parse_page_range(pages_str, total_pages):
 
 def pdfs_to_pngs(config, target_width=1920, target_height=1080):
     """Convert PDF files to PNG images based on config."""
-    cache_root = Path(config["settings"].get("output_cache", "output_cache/"))
-    cache_root.mkdir(exist_ok=True)
+    default_cache = Path.home() / ".cache" / "videoslides"
+    cache_root = Path(config["settings"].get("output_cache", str(default_cache)))
+    cache_root.mkdir(parents=True, exist_ok=True)
 
     pdf_threads = config["settings"].get("pdf_threads", 4)
     background_color = config["settings"].get("background_color", "black")
@@ -152,7 +153,8 @@ def pdfs_to_pngs(config, target_width=1920, target_height=1080):
 
 def pngs_to_video(config):
     """Convert PNG images to video (MP4 or MKV)."""
-    cache_root = Path(config["settings"].get("output_cache", "output_cache/"))
+    default_cache = Path.home() / ".cache" / "videoslides"
+    cache_root = Path(config["settings"].get("output_cache", str(default_cache)))
     output_format = config["settings"].get("output_format", "mp4").lower()
 
     # Set default filename based on format
