@@ -254,14 +254,14 @@ def pngs_to_video(config):
                 fps=fps,
                 threads=None,
                 codec='libx264',
-                ffmpeg_params=['-g', str(keyframe_interval), '-keyint_min', str(keyframe_interval)]
+                ffmpeg_params=['-g', str(keyframe_interval), '-keyint_min', str(keyframe_interval), '-sc_threshold', '0']
             )
         else:
             final.write_videofile(
                 output_filename,
                 fps=fps,
                 threads=None,
-                ffmpeg_params=['-g', str(keyframe_interval), '-keyint_min', str(keyframe_interval)]
+                ffmpeg_params=['-g', str(keyframe_interval), '-keyint_min', str(keyframe_interval), '-sc_threshold', '0']
             )
 
         print(f"✅ Video saved as '{output_filename}'")
