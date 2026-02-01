@@ -51,7 +51,7 @@ output_cache = "~/.cache/videoslides"  # default
 output_video = "presentation.mp4"  # default
 output_format = "mp4"        # default, can be "mp4" or "mkv"
 resolution = [1920, 1080]    # default
-fps = 1                      # default
+fps = 5                      # default
 keyframe_interval = 15       # default, seconds between keyframes
 background_color = "black"   # default
 pdf_threads = 4              # default
@@ -130,7 +130,7 @@ All settings have default values and are optional:
 - `output_video`: Output video filename (default: "presentation.mp4" or "presentation.mkv" based on format)
 - `output_format`: Video format - "mp4" or "mkv" (default: "mp4")
 - `resolution`: Video resolution as [width, height] (default: [1920, 1080])
-- `fps`: Video frame rate (default: 1)
+- `fps`: Video frame rate (default: 5)
 - `keyframe_interval`: Seconds between keyframes in the output video (default: 15)
 - `background_color`: Background color for letterboxing (default: "black")
 - `pdf_threads`: Number of threads for PDF processing (default: 4)

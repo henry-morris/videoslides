@@ -161,7 +161,7 @@ def pngs_to_video(config):
     default_filename = f"presentation.{output_format}"
     output_filename = config["settings"].get("output_video", default_filename)
 
-    fps = config["settings"].get("fps", 1)
+    fps = config["settings"].get("fps", 5)
     keyframe_seconds = config["settings"].get("keyframe_interval", 15)
     resolution = config["settings"].get("resolution", [1920, 1080])
 
