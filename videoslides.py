@@ -160,6 +160,7 @@ def pngs_to_video(config):
     output_filename = config["settings"].get("output_video", default_filename)
 
     fps = config["settings"].get("fps", 1)
+    keyframe_seconds = config["settings"].get("keyframe_interval", 15)
     resolution = config["settings"].get("resolution", [1920, 1080])
 
     print(f"🎥 Starting PNG → {output_format.upper()} conversion...")
@@ -213,8 +214,8 @@ def pngs_to_video(config):
             clip = ImageClip(str(cached_png)).with_duration(duration)
 
             # For long slides, note that keyframes will be added during encoding
-            if duration > 15:
-                keyframe_count = duration // 15 + 1  # Every 15s + end
+            if duration > keyframe_seconds:
+                keyframe_count = duration // keyframe_seconds + 1
                 print(f"🔑 Long slide detected - will add ~{keyframe_count} keyframes during encoding")
 
             # Add progress bar to this clip if requested
@@ -243,8 +244,7 @@ def pngs_to_video(config):
         final = concatenate_videoclips(clips, method="compose")
 
         # Set codec and keyframe interval based on format
-        # For keyframes every 15 seconds: keyint = fps * 15
-        keyframe_interval = fps * 15
+        keyframe_interval = fps * keyframe_seconds
 
         if output_format == "mkv":
             final.write_videofile(

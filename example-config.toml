@@ -6,6 +6,7 @@ output_cache = "output_cache/"
 output_video = "presentation.mp4"
 resolution = [1920, 1080]
 fps = 1
+keyframe_interval = 15
 background_color = "black"
 pdf_threads = 4
 
