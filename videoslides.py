@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
 
-from PyPDF2 import PdfReader, PdfWriter
 from pdf2image import convert_from_path
 from PIL import Image
 from pathlib import Path
-import re
 import argparse
 import os
 import tomllib
 import hashlib
-from moviepy import ImageClip, concatenate_videoclips, ColorClip, CompositeVideoClip, VideoClip
-from PIL import ImageDraw
+from moviepy import ImageClip, concatenate_videoclips, CompositeVideoClip, VideoClip
 
 
 def calculate_pdf_hash(pdf_path):
@@ -72,7 +69,7 @@ def pdfs_to_pngs(config, target_width=1920, target_height=1080):
 
     for order, slide in enumerate(config["slides"], start=1):
         filename = slide["filename"]
-        duration = slide.get("duration", 15)
+        duration = slide.get("duration", 15) or 15
         pages_spec = slide.get("pages", "all")
 
         pdf_file = Path(filename)
@@ -170,7 +167,7 @@ def pngs_to_video(config):
     clips = []
     for order, slide in enumerate(config["slides"], start=1):
         filename = slide["filename"]
-        duration = slide.get("duration", 15)
+        duration = slide.get("duration", 15) or 15
         pages_spec = slide.get("pages", "all")
 
         pdf_file = Path(filename)

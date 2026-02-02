@@ -1,14 +1,9 @@
 # VideoSlides
 
-Convert PDF presentations to video with configurable slide order, durations, and page ranges.
+Two tools for working with PDF presentations, sharing the same TOML config and cached slide images.
 
-## Features
-
-- Convert multiple PDFs to a single MP4 video
-- Configurable slide order and duration per slide
-- Flexible page selection (all, ranges, specific pages)
-- Letterboxed output with customizable resolution
-- TOML configuration for easy management
+- **videoslides** -- render a presentation to an MP4/MKV video file
+- **presentslides** -- run an interactive full-screen presentation with auto-advance, keyboard navigation, and a slide overview
 
 ## Installation
 
@@ -22,148 +17,172 @@ uv sync
 uv pip install -e .
 ```
 
-## Usage
-
-### Basic Usage
-
-```bash
-# Run with default config.toml in current directory
-uv run videoslides
-
-# Run in different directory (default: current directory)
-uv run videoslides /path/to/slides
-
-# Use custom config file (default: config.toml)
-uv run videoslides --config myconfig.toml
-
-# Combine directory and config
-uv run videoslides /path/to/slides --config myconfig.toml
-```
-
-### Configuration
-
-Create a `config.toml` file to define your presentation. The `[settings]` section is optional since all parameters have defaults:
-
-```toml
-# Optional settings section - all values have defaults
-[settings]
-output_cache = "~/.cache/videoslides"  # default
-output_video = "presentation.mp4"  # default
-output_format = "mp4"        # default, can be "mp4" or "mkv"
-resolution = [1920, 1080]    # default
-fps = 5                      # default
-keyframe_interval = 15       # default, seconds between keyframes
-background_color = "black"   # default
-pdf_threads = 4              # default
-
-# Minimal example - only slides are required
-[[slides]]
-filename = "intro.pdf"
-duration = 10
-pages = "all"
-
-[[slides]]
-filename = "main_content.pdf"
-duration = 15
-pages = "1-3,5"
-
-[[slides]]
-filename = "conclusion.pdf"
-duration = 8
-pages = "2"
-```
-
-#### MKV Format Example
-
-```toml
-[settings]
-output_format = "mkv"
-output_video = "my_presentation.mkv"
-
-[[slides]]
-filename = "slides.pdf"
-duration = 12
-pages = "all"
-```
-
-#### Progress Bar Example
-
-You can add progress bars to individual slides to show progress through each page's duration:
-
-```toml
-[[slides]]
-filename = "intro.pdf"
-duration = 10
-pages = "all"
-# No progress bar on this slide
-
-[[slides]]
-filename = "main_presentation.pdf"
-duration = 30
-pages = "1-5"
-show_progress_bar = true
-progress_bar_color = "red"
-progress_bar_height = 8
-
-[[slides]]
-filename = "conclusion.pdf"
-duration = 15
-pages = "all"
-show_progress_bar = true
-progress_bar_color = "blue"
-# Uses default height of 10 pixels
-```
-
-### Page Range Syntax
-
-- `"all"` - Include all pages
-- `"1"` - Single page
-- `"1-3"` - Range of pages (1, 2, 3)
-- `"1,3,5"` - Specific pages
-- `"1-3,7,10-12"` - Mixed ranges and specific pages
-
-### Configuration Options
-
-#### Settings
-All settings have default values and are optional:
-- `output_cache`: Directory for cached PNG files (default: "~/.cache/videoslides")
-- `output_video`: Output video filename (default: "presentation.mp4" or "presentation.mkv" based on format)
-- `output_format`: Video format - "mp4" or "mkv" (default: "mp4")
-- `resolution`: Video resolution as [width, height] (default: [1920, 1080])
-- `fps`: Video frame rate (default: 5)
-- `keyframe_interval`: Seconds between keyframes in the output video (default: 15)
-- `background_color`: Background color for letterboxing (default: "black")
-- `pdf_threads`: Number of threads for PDF processing (default: 4)
-
-#### Slides
-Each `[[slides]]` entry defines:
-- `filename`: PDF file to process (required)
-- `duration`: Seconds to display each page from this PDF (default: 15)
-- `pages`: Which pages to include (default: "all") - see Page Range Syntax above
-- `show_progress_bar`: Show progress bar at bottom for this slide (default: false)
-- `progress_bar_color`: Color of the progress bar (default: Land Talks dark green)
-- `progress_bar_height`: Height of the progress bar in pixels (default: 16)
-
-## How It Works
-
-1. **PDF to PNG**: Converts specified pages from each PDF to PNG images with letterboxing
-2. **PNG to MP4**: Combines PNG images into a video where each image displays for its configured duration
-3. **Ordering**: Slides appear in the video in the order defined in the config file
-
-## Dependencies
-
-- PyPDF2: PDF processing
-- pdf2image: PDF to image conversion
-- Pillow: Image manipulation
-- moviepy: Video generation
-
-## System Requirements
+### System Requirements
 
 - Python 3.11+
 - poppler-utils (for pdf2image)
   - macOS: `brew install poppler`
   - Ubuntu: `sudo apt-get install poppler-utils`
   - Windows: Download from https://blog.alivate.com.au/poppler-windows/
+
+## Quick Start
+
+Both tools read a `config.toml` that lists PDF files, page ranges, and durations:
+
+```bash
+# Render to video
+uv run videoslides
+
+# Present interactively
+uv run presentslides
+```
+
+Both accept the same arguments:
+
+```bash
+uv run videoslides /path/to/slides --config myconfig.toml
+uv run presentslides /path/to/slides --config myconfig.toml
+```
+
+## Configuration
+
+Create a `config.toml` in your slides directory. The `[settings]` section is optional -- all values have defaults.
+
+```toml
+[settings]
+output_cache = "~/.cache/videoslides"  # default
+output_video = "presentation.mp4"      # default
+output_format = "mp4"        # "mp4" or "mkv"
+resolution = [1920, 1080]    # default
+fps = 5                      # default (videoslides only)
+keyframe_interval = 15       # default, seconds (videoslides only)
+background_color = "black"   # default
+pdf_threads = 4              # default
+
+[[slides]]
+filename = "intro.pdf"
+duration = 10
+pages = "all"
+title = "Introduction"
+show_page_number = true
+show_progress_bar = true
+
+[[slides]]
+filename = "main_content.pdf"
+duration = 15
+pages = "1-3,5"
+title = "Main Topic"
+show_progress_bar = true
+progress_bar_color = "red"
+progress_bar_height = 8
+
+[[slides]]
+filename = "conclusion.pdf"
+duration = 8
+pages = "2"
+title = "Summary"
+```
+
+### Settings Reference
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `output_cache` | `~/.cache/videoslides` | Directory for cached PNG files |
+| `output_video` | `presentation.mp4` | Output video filename (videoslides) |
+| `output_format` | `mp4` | `mp4` or `mkv` (videoslides) |
+| `resolution` | `[1920, 1080]` | Slide resolution |
+| `fps` | `5` | Video frame rate (videoslides) |
+| `keyframe_interval` | `15` | Seconds between keyframes (videoslides) |
+| `background_color` | `black` | Letterbox fill color |
+| `pdf_threads` | `4` | Threads for PDF rendering |
+
+### Slide Options
+
+Each `[[slides]]` entry supports:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `filename` | *(required)* | PDF file path |
+| `duration` | `15` | Seconds per page. `0` = pause-only (presentslides pauses on arrival; unpause to advance) |
+| `pages` | `all` | Page selection (see below) |
+| `title` | *(inherited)* | Short label shown on the presenter info bar. Carries forward to subsequent sections until changed. |
+| `show_page_number` | `false` | Show PDF page number on the presenter info bar |
+| `show_progress_bar` | `false` | Animated progress bar at the bottom of the slide |
+| `progress_bar_color` | white (presenter) / `#1f4305` (video) | Bar color, hex or named |
+| `progress_bar_height` | `6` (presenter) / `16` (video) | Bar height in pixels |
+
+### Page Range Syntax
+
+- `"all"` -- all pages
+- `"1"` -- single page
+- `"1-3"` -- range (1, 2, 3)
+- `"1,3,5"` -- specific pages
+- `"1-3,7,10-12"` -- mixed
+
+## videoslides
+
+Renders the presentation to an MP4 or MKV video file.
+
+```bash
+uv run videoslides
+uv run videoslides /path/to/slides
+uv run videoslides --config myconfig.toml
+```
+
+### How it works
+
+1. Converts PDF pages to cached PNG images (letterboxed to target resolution)
+2. Assembles PNGs into a video with configured durations per slide
+3. Optionally overlays per-slide progress bars
+4. Encodes with H.264, configurable keyframe interval
+
+## presentslides
+
+Launches an interactive full-screen presentation.
+
+```bash
+uv run presentslides
+uv run presentslides /path/to/slides
+uv run presentslides --config myconfig.toml
+```
+
+### Features
+
+- Auto-advances slides based on configured durations
+- Per-slide progress bar (when enabled)
+- Info bar with slide counter, presentation timer, title, page number, and countdown (press **T** to toggle, shown automatically when paused)
+- Slide overview with thumbnails (press **Tab** or **O**)
+- Black/white screen blanking for Q&A
+- Fullscreen and windowed modes
+
+### Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| Right / Enter | Next slide |
+| Left / Backspace | Previous slide |
+| Home / End | First / last slide |
+| Space / P | Pause / play |
+| T | Toggle info bar |
+| G | Go to slide by number |
+| Tab / O | Slide overview |
+| B / W | Black / white screen |
+| F / F11 | Toggle fullscreen |
+| H / F1 / ? | Help overlay |
+| Q / Escape | Quit |
+
+Mouse: left-click = next, right-click = previous.
+
+## Shared Cache
+
+Both tools use the same PNG cache (`~/.cache/videoslides/` by default). PDFs are hashed by content, so the same PDF is only rendered once regardless of which tool you use or how many projects reference it.
+
+## Dependencies
+
+- **pdf2image** + **Pillow** -- PDF to PNG conversion and image processing
+- **moviepy** -- video encoding (videoslides)
+- **pygame** -- interactive display (presentslides)
+- **PyPDF2** -- PDF utilities
 
 ## License
 
