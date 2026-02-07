@@ -2,7 +2,7 @@
 
 # /// script
 # dependencies = [
-#   "pygame", "pdf2image", "moviepy"
+#   "pygame", "pdf2image", "moviepy", "toml"
 # ]
 # ///
 
