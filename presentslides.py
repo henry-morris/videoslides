@@ -33,6 +33,7 @@ OVERVIEW_PADDING = 20
 FONT_SIZE_INFO = 24
 FONT_SIZE_HELP = 20
 FONT_SIZE_BIG = 48
+FONT_SIZE_SECTION = 30
 
 # Default progress bar style (used when slides don't specify their own)
 DEFAULT_PROGRESS_COLOR = (31, 67, 5)
@@ -123,7 +124,10 @@ class Presenter:
         self.windowed_size = (self.resolution[0] * 2 // 3, self.resolution[1] * 2 // 3)
         self.overview_selected = 0
         self.overview_scroll = 0
-        self.overview_enter_time = 0.0
+        self.overview_preferred_col = 0  # Remember column position for up/down navigation
+        self._sections_cache = None
+        self._overview_mousedown_idx = None
+        self._overview_thumb_cache = {}
 
         # Pygame objects (initialized in init_pygame)
         self.screen = None
@@ -171,6 +175,7 @@ class Presenter:
         self.font = pygame.font.SysFont("sans", FONT_SIZE_INFO)
         self.small_font = pygame.font.SysFont("sans", FONT_SIZE_HELP)
         self.big_font = pygame.font.SysFont("sans", FONT_SIZE_BIG)
+        self.section_font = pygame.font.SysFont("sans", FONT_SIZE_SECTION)
 
         self._load_images()
         pygame.mouse.set_visible(False)
@@ -293,6 +298,8 @@ class Presenter:
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button in (1, 3):
                     self._mouse_held = None
+                if self.mode == self.MODE_OVERVIEW and event.button == 1:
+                    self._on_overview_mouseup(event)
 
     def _on_key(self, event):
         if self.mode == self.MODE_GOTO:
@@ -349,9 +356,16 @@ class Presenter:
             self.mode = self.MODE_OVERVIEW
             self.overview_selected = self.current
             self.overview_scroll = 0
-            self.overview_enter_time = 0.0
+            self._sections_cache = self._overview_sections()  # Cache sections
+            self._overview_thumb_cache = {}  # Clear thumb cache for new size
+            self._overview_pregenerate_thumbs()  # Pre-generate all thumbnails
+            # Initialize preferred column from current position
+            _, _, col = self._overview_find_position(self.current)
+            if col is not None:
+                self.overview_preferred_col = col
             self._overview_ensure_visible()
             pygame.mouse.set_visible(True)
+            pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
 
         # Help
         elif key in (pygame.K_h, pygame.K_F1) or uni == "?":
@@ -381,18 +395,144 @@ class Presenter:
         cell_h = th + pad + 30
         return tw, th, cell_h
 
+    def _overview_pregenerate_thumbs(self):
+        """Pre-generate all thumbnails at the current overview size for fast drawing."""
+        tw, th, _ = self._overview_layout()
+        for i in range(len(self.slides)):
+            cache_key = (i, tw, th)
+            self._overview_thumb_cache[cache_key] = pygame.transform.smoothscale(
+                self.thumb_surfaces[i], (tw, th)
+            )
+
+    def _overview_find_position(self, slide_idx):
+        """Find (section_idx, row_in_section, col_in_section) for a slide."""
+        sections = self._overview_sections()
+        cols = OVERVIEW_COLS
+
+        for sec_idx, section in enumerate(sections):
+            if section["start"] <= slide_idx < section["end"]:
+                pos_in_section = slide_idx - section["start"]
+                row = pos_in_section // cols
+                col = pos_in_section % cols
+                return sec_idx, row, col
+        return None, None, None
+
+    def _overview_find_slide(self, section_idx, row, col):
+        """Find slide index at (section_idx, row, col), or closest valid slide."""
+        sections = self._overview_sections()
+        cols = OVERVIEW_COLS
+
+        if section_idx < 0 or section_idx >= len(sections):
+            return None
+
+        section = sections[section_idx]
+        section_slides = section["end"] - section["start"]
+        rows_in_section = (section_slides + cols - 1) // cols
+
+        # Clamp row to valid range
+        if row < 0:
+            return None
+        if row >= rows_in_section:
+            return None
+
+        # Find slide at (row, col) or closest in that row
+        pos_in_section = row * cols + col
+        if pos_in_section >= section_slides:
+            # Column doesn't exist in this row, use last slide in row
+            pos_in_section = min(row * cols + cols - 1, section_slides - 1)
+
+        return section["start"] + pos_in_section
+
+    def _overview_sections(self):
+        """Build list of sections with their slide ranges."""
+        if self._sections_cache is not None:
+            return self._sections_cache
+
+        sections = []
+        current_title = None
+        start_idx = 0
+
+        for i, slide in enumerate(self.slides):
+            title = slide.get("title")
+            if title != current_title:
+                if current_title is not None:
+                    sections.append({
+                        "title": current_title,
+                        "start": start_idx,
+                        "end": i
+                    })
+                current_title = title
+                start_idx = i
+
+        # Add the last section
+        if current_title is not None:
+            sections.append({
+                "title": current_title,
+                "start": start_idx,
+                "end": len(self.slides)
+            })
+
+        return sections
+
+    def _overview_slide_position(self, slide_idx):
+        """Calculate (x, y) position for a slide in the sectioned layout."""
+        tw, th, cell_h = self._overview_layout()
+        cols = OVERVIEW_COLS
+        pad = OVERVIEW_PADDING
+        heading_h = 75
+
+        sections = self._overview_sections()
+        y_offset = pad
+
+        for section in sections:
+            # Add heading height
+            y_offset += heading_h
+
+            if slide_idx < section["start"]:
+                break
+            elif slide_idx < section["end"]:
+                # Slide is in this section
+                pos_in_section = slide_idx - section["start"]
+                row_in_section = pos_in_section // cols
+                col = pos_in_section % cols
+
+                x = pad + col * (tw + pad)
+                y = y_offset + row_in_section * cell_h
+                return x, y
+            else:
+                # Skip past this section
+                section_slides = section["end"] - section["start"]
+                rows_in_section = (section_slides + cols - 1) // cols
+                y_offset += rows_in_section * cell_h
+
+        return None, None
+
     def _overview_max_scroll(self):
         """Maximum scroll offset so last row stays visible."""
         _, _, cell_h = self._overview_layout()
-        rows = (len(self.slides) + OVERVIEW_COLS - 1) // OVERVIEW_COLS
-        content_h = OVERVIEW_PADDING + rows * cell_h
+        cols = OVERVIEW_COLS
+        pad = OVERVIEW_PADDING
+        heading_h = 75
+
+        sections = self._overview_sections()
+        content_h = pad
+
+        for section in sections:
+            content_h += heading_h
+            section_slides = section["end"] - section["start"]
+            rows_in_section = (section_slides + cols - 1) // cols
+            content_h += rows_in_section * cell_h
+
         return max(0, content_h - self.screen_h)
 
     def _overview_ensure_visible(self):
         """Scroll to keep overview_selected on screen."""
         _, _, cell_h = self._overview_layout()
-        row = self.overview_selected // OVERVIEW_COLS
-        item_top = OVERVIEW_PADDING + row * cell_h
+        _, item_top = self._overview_slide_position(self.overview_selected)
+
+        if item_top is None:
+            return
+
         item_bottom = item_top + cell_h
 
         if item_top < self.overview_scroll:
@@ -407,25 +547,62 @@ class Presenter:
         cols = OVERVIEW_COLS
 
         if key in (pygame.K_ESCAPE, pygame.K_TAB, pygame.K_o):
+            # Pre-scale current slide for instant display
+            self._scaled_surface(self.current)
             self.mode = self.MODE_PRESENT
             if self.fullscreen:
                 pygame.mouse.set_visible(False)
         elif key == pygame.K_RETURN:
             self.goto_slide(self.overview_selected)
+            # Pre-scale selected slide for instant display
+            self._scaled_surface(self.overview_selected)
             self.mode = self.MODE_PRESENT
             if self.fullscreen:
                 pygame.mouse.set_visible(False)
         elif key == pygame.K_RIGHT:
-            self.overview_selected = min(self.overview_selected + 1, len(self.slides) - 1)
+            if self.overview_selected < len(self.slides) - 1:
+                self.overview_selected += 1
+                # Update preferred column when moving horizontally
+                _, _, col = self._overview_find_position(self.overview_selected)
+                if col is not None:
+                    self.overview_preferred_col = col
             self._overview_ensure_visible()
         elif key == pygame.K_LEFT:
-            self.overview_selected = max(self.overview_selected - 1, 0)
+            if self.overview_selected > 0:
+                self.overview_selected -= 1
+                # Update preferred column when moving horizontally
+                _, _, col = self._overview_find_position(self.overview_selected)
+                if col is not None:
+                    self.overview_preferred_col = col
             self._overview_ensure_visible()
         elif key == pygame.K_DOWN:
-            self.overview_selected = min(self.overview_selected + cols, len(self.slides) - 1)
+            # Move to next row, maintaining preferred column
+            sec_idx, row, col = self._overview_find_position(self.overview_selected)
+            if sec_idx is not None:
+                sections = self._overview_sections()
+                # Try next row in same section
+                new_idx = self._overview_find_slide(sec_idx, row + 1, self.overview_preferred_col)
+                if new_idx is None and sec_idx + 1 < len(sections):
+                    # Move to first row of next section
+                    new_idx = self._overview_find_slide(sec_idx + 1, 0, self.overview_preferred_col)
+                if new_idx is not None:
+                    self.overview_selected = new_idx
             self._overview_ensure_visible()
         elif key == pygame.K_UP:
-            self.overview_selected = max(self.overview_selected - cols, 0)
+            # Move to previous row, maintaining preferred column
+            sec_idx, row, col = self._overview_find_position(self.overview_selected)
+            if sec_idx is not None:
+                sections = self._overview_sections()
+                # Try previous row in same section
+                new_idx = self._overview_find_slide(sec_idx, row - 1, self.overview_preferred_col)
+                if new_idx is None and sec_idx > 0:
+                    # Move to last row of previous section
+                    prev_section = sections[sec_idx - 1]
+                    prev_section_slides = prev_section["end"] - prev_section["start"]
+                    last_row = (prev_section_slides - 1) // cols
+                    new_idx = self._overview_find_slide(sec_idx - 1, last_row, self.overview_preferred_col)
+                if new_idx is not None:
+                    self.overview_selected = new_idx
             self._overview_ensure_visible()
         elif key == pygame.K_q:
             self.running = False
@@ -474,31 +651,62 @@ class Presenter:
         if event.button == 1:
             idx = self._overview_hit(event.pos)
             if idx is not None:
-                self.goto_slide(idx)
-                self.mode = self.MODE_PRESENT
-                if self.fullscreen:
-                    pygame.mouse.set_visible(False)
+                # Update selection and redraw immediately
+                self.overview_selected = idx
+                self._overview_mousedown_idx = idx
+                # Force immediate visual update
+                self._draw_overview()
+                pygame.display.flip()
         # Mouse wheel scrolling
         elif event.button == 4:
             self.overview_scroll = max(0, self.overview_scroll - 60)
         elif event.button == 5:
             self.overview_scroll = min(self.overview_scroll + 60, self._overview_max_scroll())
 
+    def _on_overview_mouseup(self, event):
+        idx = self._overview_hit(event.pos)
+        # Navigate if releasing on the same slide we pressed
+        if idx is not None and idx == self._overview_mousedown_idx:
+            self.goto_slide(idx)
+            self.mode = self.MODE_PRESENT
+            if self.fullscreen:
+                pygame.mouse.set_visible(False)
+        self._overview_mousedown_idx = None
+
     def _overview_hit(self, pos):
         """Return slide index at screen position, or None."""
         mx, my = pos
+        tw, th, _ = self._overview_layout()
+
+        sections = self._overview_sections()
         cols = OVERVIEW_COLS
         pad = OVERVIEW_PADDING
+        heading_h = 75
+        cell_h = th + pad + 30
 
-        tw, th, cell_h = self._overview_layout()
+        y_offset = pad - self.overview_scroll
 
-        for i in range(len(self.slides)):
-            col = i % cols
-            row = i // cols
-            x = pad + col * (tw + pad)
-            y = pad + row * cell_h - self.overview_scroll
-            if x <= mx <= x + tw and y <= my <= y + th:
-                return i
+        for section in sections:
+            # Skip heading
+            y_offset += heading_h
+
+            # Check slides in this section
+            for i in range(section["start"], section["end"]):
+                pos_in_section = i - section["start"]
+                row_in_section = pos_in_section // cols
+                col = pos_in_section % cols
+
+                x = pad + col * (tw + pad)
+                y = y_offset + row_in_section * cell_h
+
+                if x <= mx <= x + tw and y <= my <= y + th:
+                    return i
+
+            # Move past this section
+            section_slides = section["end"] - section["start"]
+            rows_in_section = (section_slides + cols - 1) // cols
+            y_offset += rows_in_section * cell_h
+
         return None
 
     # ------------------------------------------------------------------
@@ -506,9 +714,14 @@ class Presenter:
     # ------------------------------------------------------------------
 
     def update(self, dt):
-        # Update overview animation timer
+        # Update cursor in overview mode based on hover
         if self.mode == self.MODE_OVERVIEW:
-            self.overview_enter_time += dt
+            mouse_pos = pygame.mouse.get_pos()
+            hovered_idx = self._overview_hit(mouse_pos)
+            if hovered_idx is not None:
+                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+            else:
+                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
 
         # Mouse hold-to-repeat
         if self._mouse_held and self.mode == self.MODE_PRESENT:
@@ -671,70 +884,132 @@ class Presenter:
         self.screen.fill((30, 30, 30))
         cols = OVERVIEW_COLS
         pad = OVERVIEW_PADDING
+        heading_h = 75
 
         tw, th, cell_h = self._overview_layout()
+        sections = self._overview_sections()
 
-        for i in range(len(self.slides)):
-            col = i % cols
-            row = i // cols
-            x = pad + col * (tw + pad)
-            y = pad + row * cell_h - self.overview_scroll
+        # Determine hovered slide for highlighting
+        mouse_pos = pygame.mouse.get_pos()
+        hovered_idx = self._overview_hit(mouse_pos)
 
-            if y + cell_h < 0 or y > self.screen_h:
-                continue
+        y_offset = pad - self.overview_scroll
 
-            # Border with animated pulse highlight
-            if i == self.overview_selected:
-                border_color = (0, 120, 255)
-                bg_color = (0, 60, 120)
-                border_w = 4
-            elif i == self.current:
-                border_color = (255, 180, 0)
-                bg_color = (120, 80, 0)
-                border_w = 3
-            else:
-                border_color = (70, 70, 70)
-                bg_color = None
-                border_w = 1
+        for section in sections:
+            # Draw section heading with cumulative time
+            heading_y = y_offset
+            if heading_y + heading_h > 0 and heading_y < self.screen_h:
+                title_text = section["title"] if section["title"] else "Untitled"
+                title_surf = self.section_font.render(title_text, True, (140, 140, 140))
+                title_y = heading_y + 22
+                self.screen.blit(title_surf, (pad, title_y))
 
-            # Draw animated pulse highlight for current/selected (one-off)
-            if bg_color:
-                pulse_duration = 0.6
-                if self.overview_enter_time < pulse_duration:
-                    # Pulse: start at full brightness, fade out
-                    progress = self.overview_enter_time / pulse_duration
-                    alpha = int(180 * (1.0 - progress))
-                    highlight_pad = 8
-                    pulse_surf = pygame.Surface((tw + highlight_pad * 2, th + highlight_pad * 2), pygame.SRCALPHA)
-                    pulse_color = bg_color + (alpha,)
+                # Calculate cumulative time up to this section
+                cumulative_time = sum(self.slides[j]["duration"] for j in range(section["start"]))
+                mins = int(cumulative_time) // 60
+                secs = int(cumulative_time) % 60
+                time_text = f"{mins}:{secs:02d}"
+                time_surf = self.small_font.render(time_text, True, (100, 100, 100))
+                time_x = pad + title_surf.get_width() + 16
+                # Align baselines of title and time
+                title_baseline = title_y + self.section_font.get_ascent()
+                time_y = title_baseline - self.small_font.get_ascent()
+                self.screen.blit(time_surf, (time_x, time_y))
+
+            y_offset += heading_h
+
+            # Draw slides in this section
+            for i in range(section["start"], section["end"]):
+                pos_in_section = i - section["start"]
+                row_in_section = pos_in_section // cols
+                col = pos_in_section % cols
+
+                x = pad + col * (tw + pad)
+                y = y_offset + row_in_section * cell_h
+
+                if y + cell_h < 0 or y > self.screen_h:
+                    continue
+
+                # Border
+                if i == self.overview_selected:
+                    border_color = (0, 120, 255)
+                    border_w = 4
+                elif i == self.current:
+                    border_color = (255, 180, 0)
+                    border_w = 3
+                else:
+                    border_color = (70, 70, 70)
+                    border_w = 1
+
+                pygame.draw.rect(
+                    self.screen,
+                    border_color,
+                    (x - border_w, y - border_w, tw + border_w * 2, th + border_w * 2),
+                    border_w,
+                )
+
+                # Hover highlight
+                if i == hovered_idx and i != self.overview_selected and i != self.current:
+                    hover_w = 2
                     pygame.draw.rect(
-                        pulse_surf,
-                        pulse_color,
-                        (0, 0, tw + highlight_pad * 2, th + highlight_pad * 2),
-                        0,
-                        border_radius=4
+                        self.screen,
+                        (120, 120, 120),
+                        (x - hover_w, y - hover_w, tw + hover_w * 2, th + hover_w * 2),
+                        hover_w,
                     )
-                    self.screen.blit(pulse_surf, (x - highlight_pad, y - highlight_pad))
 
-            pygame.draw.rect(
-                self.screen,
-                border_color,
-                (x - border_w, y - border_w, tw + border_w * 2, th + border_w * 2),
-                border_w,
-            )
+                # Thumbnail (cached for performance)
+                cache_key = (i, tw, th)
+                if cache_key not in self._overview_thumb_cache:
+                    self._overview_thumb_cache[cache_key] = pygame.transform.smoothscale(
+                        self.thumb_surfaces[i], (tw, th)
+                    )
+                thumb = self._overview_thumb_cache[cache_key]
+                self.screen.blit(thumb, (x, y))
 
-            # Thumbnail
-            thumb = pygame.transform.smoothscale(self.thumb_surfaces[i], (tw, th))
-            self.screen.blit(thumb, (x, y))
+                # Duration 0 badge (pause icon)
+                if self.slides[i]["duration"] == 0:
+                    badge_size = 24
+                    badge_x = x + tw - badge_size - 4
+                    badge_y = y + 4
+                    # Semi-transparent background
+                    badge_surf = pygame.Surface((badge_size, badge_size), pygame.SRCALPHA)
+                    pygame.draw.circle(badge_surf, (0, 0, 0, 160), (badge_size // 2, badge_size // 2), badge_size // 2)
+                    self.screen.blit(badge_surf, (badge_x, badge_y))
+                    # Draw pause icon (two vertical bars)
+                    bar_w = 3
+                    bar_h = 10
+                    bar_spacing = 3
+                    bar_y = badge_y + (badge_size - bar_h) // 2
+                    bar1_x = badge_x + (badge_size - bar_w * 2 - bar_spacing) // 2
+                    bar2_x = bar1_x + bar_w + bar_spacing
+                    pygame.draw.rect(self.screen, (255, 200, 0), (bar1_x, bar_y, bar_w, bar_h))
+                    pygame.draw.rect(self.screen, (255, 200, 0), (bar2_x, bar_y, bar_w, bar_h))
 
-            # Number label
-            label = self.small_font.render(str(i + 1), True, (180, 180, 180))
-            self.screen.blit(label, (x + 4, y + th + 4))
+                # Page number label (from slide data)
+                page_num = self.slides[i]["page"]
+                label = self.small_font.render(str(page_num), True, (180, 180, 180))
+                self.screen.blit(label, (x + 4, y + th + 4))
 
-        # Footer hint
-        hint = "Arrow keys / click to select  |  Enter to go  |  Tab / Esc to return"
-        hs = self.small_font.render(hint, True, (120, 120, 120))
-        self.screen.blit(hs, ((self.screen_w - hs.get_width()) // 2, self.screen_h - 30))
+                # Duration label (for slides > 15 seconds)
+                duration = self.slides[i]["duration"]
+                if duration > 15:
+                    if duration >= 60:
+                        mins = duration // 60
+                        secs = duration % 60
+                        if secs > 0:
+                            dur_text = f"{mins}m {secs}s"
+                        else:
+                            dur_text = f"{mins}m"
+                    else:
+                        dur_text = f"{duration}s"
+                    dur_label = self.small_font.render(dur_text, True, (150, 150, 150))
+                    self.screen.blit(dur_label, (x + tw - dur_label.get_width() - 4, y + th + 4))
+
+            # Move past this section
+            section_slides = section["end"] - section["start"]
+            rows_in_section = (section_slides + cols - 1) // cols
+            y_offset += rows_in_section * cell_h
 
     def _draw_help_overlay(self):
         overlay = pygame.Surface((self.screen_w, self.screen_h), pygame.SRCALPHA)
@@ -798,7 +1073,7 @@ class Presenter:
 
         for kind, key, desc in lines:
             if kind == "heading":
-                s = self.font.render(desc, True, (100, 230, 120))
+                s = self.section_font.render(desc, True, (140, 140, 140))
                 self.screen.blit(s, ((self.screen_w - s.get_width()) // 2, y))
                 rule_y = y + s.get_height() + 4
                 pygame.draw.line(self.screen, (60, 60, 60), (rule_x1, rule_y), (rule_x2, rule_y))

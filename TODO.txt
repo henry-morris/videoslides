@@ -1,4 +1,0 @@
-
-Slow to exit on esc, wonder why
-
-
