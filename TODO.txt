@@ -1,0 +1,6 @@
+
+Factor out common PNG caching functions and so on between the two params
+Update depedencies for direct running with uv to then only need the ones needed for each program
+Slow to exit on esc, wonder why
+
+

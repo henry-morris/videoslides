@@ -1,4 +1,11 @@
-#!/usr/bin/env python3
+#!/usr/bin/env uv run
+
+# /// script
+# dependencies = [
+#   "pygame", "pdf2image", "moviepy"
+# ]
+# ///
+
 """Interactive slide presenter - reads VideoSlides config files."""
 
 import argparse
