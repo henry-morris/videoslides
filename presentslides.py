@@ -857,11 +857,21 @@ class Presenter:
 
         # Center: status indicator
         if self.auto_paused:
-            pass
+            pw = self.font.render("WAITING", True, (0, 0, 0)).get_width()
+            self._text_with_shadow(
+                self.font, "WAITING", (100, 200, 255),
+                ((self.screen_w - pw) // 2, text_y),
+            )
         elif self.paused:
             pw = self.font.render("PAUSED", True, (0, 0, 0)).get_width()
             self._text_with_shadow(
                 self.font, "PAUSED", (255, 200, 0),
+                ((self.screen_w - pw) // 2, text_y),
+            )
+        elif self.show_info and slide["duration"] > 0:
+            pw = self.font.render("RUNNING", True, (0, 0, 0)).get_width()
+            self._text_with_shadow(
+                self.font, "RUNNING", (80, 220, 100),
                 ((self.screen_w - pw) // 2, text_y),
             )
 
