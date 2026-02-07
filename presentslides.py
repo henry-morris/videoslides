@@ -1,8 +1,9 @@
 #!/usr/bin/env uv run
 
 # /// script
+# requires_python = "==3.11.*"
 # dependencies = [
-#   "pygame", "pdf2image", "moviepy", "toml"
+#   "pygame", "pdf2image", "moviepy"
 # ]
 # ///
 
