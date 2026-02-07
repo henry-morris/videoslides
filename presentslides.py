@@ -355,7 +355,6 @@ class Presenter:
         elif key in (pygame.K_TAB, pygame.K_o):
             self.mode = self.MODE_OVERVIEW
             self.overview_selected = self.current
-            self.overview_scroll = 0
             self._sections_cache = self._overview_sections()  # Cache sections
             self._overview_thumb_cache = {}  # Clear thumb cache for new size
             self._overview_pregenerate_thumbs()  # Pre-generate all thumbnails
@@ -363,7 +362,7 @@ class Presenter:
             _, _, col = self._overview_find_position(self.current)
             if col is not None:
                 self.overview_preferred_col = col
-            self._overview_ensure_visible()
+            self._overview_ensure_visible_or_center()
             pygame.mouse.set_visible(True)
             pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
 
@@ -526,7 +525,8 @@ class Presenter:
         return max(0, content_h - self.screen_h)
 
     def _overview_ensure_visible(self):
-        """Scroll to keep overview_selected on screen."""
+        """Scroll to keep overview_selected on screen, with section title visible."""
+        heading_h = 75
         _, _, cell_h = self._overview_layout()
         _, item_top = self._overview_slide_position(self.overview_selected)
 
@@ -535,12 +535,55 @@ class Presenter:
 
         item_bottom = item_top + cell_h
 
+        # Find if this is row 0 of its section (needs title visible)
+        _, row_in_sec, _ = self._overview_find_position(self.overview_selected)
+        heading_top = item_top - row_in_sec * cell_h - heading_h
+
         if item_top < self.overview_scroll:
-            self.overview_scroll = item_top
+            # Scrolling up — show section title if first row
+            if row_in_sec == 0:
+                self.overview_scroll = heading_top - OVERVIEW_PADDING
+            else:
+                self.overview_scroll = item_top
         elif item_bottom > self.overview_scroll + self.screen_h:
             self.overview_scroll = item_bottom - self.screen_h
 
         self.overview_scroll = max(0, min(self.overview_scroll, self._overview_max_scroll()))
+
+    def _overview_ensure_visible_or_center(self):
+        """Keep previous scroll if selected slide is comfortably on screen, otherwise center."""
+        _, _, cell_h = self._overview_layout()
+        heading_h = 75
+        _, item_top = self._overview_slide_position(self.overview_selected)
+
+        if item_top is None:
+            return
+
+        item_bottom = item_top + cell_h
+        view_top = self.overview_scroll
+        view_bottom = self.overview_scroll + self.screen_h
+
+        # Find the section heading position for this slide's section
+        sec_idx, row_in_sec, _ = self._overview_find_position(self.overview_selected)
+        heading_top = item_top - row_in_sec * cell_h - heading_h
+
+        # The slide must not be in the top or bottom visible row.
+        # Also the section title must be visible if this is the top row of its section.
+        margin = cell_h  # one row of margin from top and bottom edges
+        comfortable = (
+            item_top >= view_top + margin
+            and item_bottom <= view_bottom - margin
+            and (row_in_sec > 0 or heading_top >= view_top)
+        )
+
+        if not comfortable:
+            # Center the slide vertically
+            center = item_top + cell_h // 2
+            self.overview_scroll = center - self.screen_h // 2
+            # But don't scroll past the section title for row 0
+            if row_in_sec == 0:
+                self.overview_scroll = min(self.overview_scroll, heading_top - OVERVIEW_PADDING)
+            self.overview_scroll = max(0, min(self.overview_scroll, self._overview_max_scroll()))
 
     def _key_overview(self, event):
         key = event.key
