@@ -1028,44 +1028,21 @@ class Presenter:
                 thumb = self._overview_thumb_cache[cache_key]
                 self.screen.blit(thumb, (x, y))
 
-                # Duration 0 badge (pause icon)
-                if self.slides[i]["duration"] == 0:
-                    badge_size = 24
-                    badge_x = x + tw - badge_size - 4
-                    badge_y = y + 4
-                    # Semi-transparent background
-                    badge_surf = pygame.Surface((badge_size, badge_size), pygame.SRCALPHA)
-                    pygame.draw.circle(badge_surf, (0, 0, 0, 160), (badge_size // 2, badge_size // 2), badge_size // 2)
-                    self.screen.blit(badge_surf, (badge_x, badge_y))
-                    # Draw pause icon (two vertical bars)
-                    bar_w = 3
-                    bar_h = 10
-                    bar_spacing = 3
-                    bar_y = badge_y + (badge_size - bar_h) // 2
-                    bar1_x = badge_x + (badge_size - bar_w * 2 - bar_spacing) // 2
-                    bar2_x = bar1_x + bar_w + bar_spacing
-                    pygame.draw.rect(self.screen, (255, 200, 0), (bar1_x, bar_y, bar_w, bar_h))
-                    pygame.draw.rect(self.screen, (255, 200, 0), (bar2_x, bar_y, bar_w, bar_h))
-
-                # Page number label (only when show_page_number is set)
+                # Below thumbnail: page number or duration (not both)
                 if self.slides[i].get("show_page_number"):
                     label = self.small_font.render(str(self.slides[i]["page"]), True, (180, 180, 180))
                     self.screen.blit(label, (x + 4, y + th + 4))
-
-                # Duration label (for slides > 15 seconds)
-                duration = self.slides[i]["duration"]
-                if duration > 15:
-                    if duration >= 60:
-                        mins = duration // 60
-                        secs = duration % 60
-                        if secs > 0:
-                            dur_text = f"{mins}m {secs}s"
+                else:
+                    duration = self.slides[i]["duration"]
+                    if duration > 0:
+                        if duration >= 60:
+                            mins = duration // 60
+                            secs = duration % 60
+                            dur_text = f"{mins}m{secs}s" if secs > 0 else f"{mins}m"
                         else:
-                            dur_text = f"{mins}m"
-                    else:
-                        dur_text = f"{duration}s"
-                    dur_label = self.small_font.render(dur_text, True, (150, 150, 150))
-                    self.screen.blit(dur_label, (x + tw - dur_label.get_width() - 4, y + th + 4))
+                            dur_text = f"{duration}s"
+                        label = self.small_font.render(dur_text, True, (180, 180, 180))
+                        self.screen.blit(label, (x + 4, y + th + 4))
 
             # Move past this section
             section_slides = section["end"] - section["start"]
