@@ -893,7 +893,15 @@ class Presenter:
             left_parts.append(f"{slide['page']}/{slide['total_pages']}")
         if slide["duration"] > 0:
             remaining = max(1, math.ceil(slide["duration"] - self.slide_time))
-            left_parts.append(f"{remaining}s")
+            if remaining >= 60:
+                mins = remaining // 60
+                secs = remaining % 60
+                if secs > 0:
+                    left_parts.append(f"{mins}m {secs}s")
+                else:
+                    left_parts.append(f"{mins}m")
+            else:
+                left_parts.append(f"{remaining}s")
         left_str = "   ".join(left_parts)
         if left_str:
             self._text_with_shadow(self.font, left_str, (255, 255, 255), (16, text_y))
@@ -1039,10 +1047,10 @@ class Presenter:
                     pygame.draw.rect(self.screen, (255, 200, 0), (bar1_x, bar_y, bar_w, bar_h))
                     pygame.draw.rect(self.screen, (255, 200, 0), (bar2_x, bar_y, bar_w, bar_h))
 
-                # Page number label (from slide data)
-                page_num = self.slides[i]["page"]
-                label = self.small_font.render(str(page_num), True, (180, 180, 180))
-                self.screen.blit(label, (x + 4, y + th + 4))
+                # Page number label (only when show_page_number is set)
+                if self.slides[i].get("show_page_number"):
+                    label = self.small_font.render(str(self.slides[i]["page"]), True, (180, 180, 180))
+                    self.screen.blit(label, (x + 4, y + th + 4))
 
                 # Duration label (for slides > 15 seconds)
                 duration = self.slides[i]["duration"]
