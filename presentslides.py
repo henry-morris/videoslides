@@ -450,13 +450,14 @@ class Presenter:
             return self._sections_cache
 
         sections = []
-        current_title = None
+        _sentinel = object()
+        current_title = _sentinel
         start_idx = 0
 
         for i, slide in enumerate(self.slides):
             title = slide.get("title")
             if title != current_title:
-                if current_title is not None:
+                if current_title is not _sentinel:
                     sections.append({
                         "title": current_title,
                         "start": start_idx,
@@ -466,7 +467,7 @@ class Presenter:
                 start_idx = i
 
         # Add the last section
-        if current_title is not None:
+        if current_title is not _sentinel:
             sections.append({
                 "title": current_title,
                 "start": start_idx,
