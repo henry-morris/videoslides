@@ -3,7 +3,9 @@
 # /// script
 # requires_python = "==3.11.*"
 # dependencies = [
-#   "pygame", "pdf2image", "moviepy"
+#   "pygame",
+#   "pdf2image",
+#   "Pillow",
 # ]
 # ///
 
@@ -16,7 +18,13 @@ from pathlib import Path
 
 import pygame
 
-from videoslides import calculate_pdf_hash, parse_page_range, pdfs_to_pngs, load_config
+from shared import (
+    parse_page_range,
+    prepare_slide_images,
+    load_config,
+    get_pdf_cache_dir,
+    get_cached_page_count,
+)
 
 
 # Layout constants
@@ -41,9 +49,6 @@ def color_from_str(color_str):
 
 def build_slide_list(config):
     """Build an ordered list of slide metadata from config, referencing cached PNGs."""
-    default_cache = Path.home() / ".cache" / "videoslides"
-    cache_root = Path(config["settings"].get("output_cache", str(default_cache)))
-
     slides = []
     prev_title = None
     for slide_cfg in config["slides"]:
@@ -56,18 +61,13 @@ def build_slide_list(config):
             print(f"Warning: '{filename}' not found, skipping")
             continue
 
-        pdf_hash = calculate_pdf_hash(pdf_file)
-        pdf_cache_dir = cache_root / pdf_hash
+        pdf_cache_dir = get_pdf_cache_dir(config, pdf_file)
+        total_pages = get_cached_page_count(pdf_cache_dir)
 
-        if not pdf_cache_dir.exists():
+        if total_pages is None:
             print(f"Warning: no cache for '{filename}', skipping")
             continue
 
-        existing_pngs = list(pdf_cache_dir.glob("*.png"))
-        if not existing_pngs:
-            continue
-
-        total_pages = max(int(p.stem) for p in existing_pngs)
         page_numbers = parse_page_range(pages_spec, total_pages)
 
         show_progress_bar = slide_cfg.get("show_progress_bar", False)
@@ -863,9 +863,8 @@ def main():
         config = load_config(args.config)
 
         # Stage 1: ensure PNGs are cached (reuses videoslides caching)
-        resolution = config["settings"].get("resolution", [1920, 1080])
         print("Preparing slide images...")
-        pdfs_to_pngs(config, target_width=resolution[0], target_height=resolution[1])
+        prepare_slide_images(config)
 
         # Build slide list from cached PNGs
         slides = build_slide_list(config)
