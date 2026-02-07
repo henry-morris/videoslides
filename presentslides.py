@@ -28,7 +28,7 @@ from shared import (
 
 
 # Layout constants
-OVERVIEW_COLS = 4
+OVERVIEW_COLS = 8
 OVERVIEW_PADDING = 20
 FONT_SIZE_INFO = 24
 FONT_SIZE_HELP = 20
@@ -123,6 +123,7 @@ class Presenter:
         self.windowed_size = (self.resolution[0] * 2 // 3, self.resolution[1] * 2 // 3)
         self.overview_selected = 0
         self.overview_scroll = 0
+        self.overview_enter_time = 0.0
 
         # Pygame objects (initialized in init_pygame)
         self.screen = None
@@ -348,6 +349,7 @@ class Presenter:
             self.mode = self.MODE_OVERVIEW
             self.overview_selected = self.current
             self.overview_scroll = 0
+            self.overview_enter_time = 0.0
             self._overview_ensure_visible()
             pygame.mouse.set_visible(True)
 
@@ -488,10 +490,7 @@ class Presenter:
         cols = OVERVIEW_COLS
         pad = OVERVIEW_PADDING
 
-        avail_w = self.screen_w - pad * (cols + 1)
-        tw = avail_w // cols
-        th = int(tw * 9 / 16)
-        cell_h = th + pad + 30
+        tw, th, cell_h = self._overview_layout()
 
         for i in range(len(self.slides)):
             col = i % cols
@@ -507,6 +506,10 @@ class Presenter:
     # ------------------------------------------------------------------
 
     def update(self, dt):
+        # Update overview animation timer
+        if self.mode == self.MODE_OVERVIEW:
+            self.overview_enter_time += dt
+
         # Mouse hold-to-repeat
         if self._mouse_held and self.mode == self.MODE_PRESENT:
             self._mouse_hold_time += dt
@@ -669,10 +672,7 @@ class Presenter:
         cols = OVERVIEW_COLS
         pad = OVERVIEW_PADDING
 
-        avail_w = self.screen_w - pad * (cols + 1)
-        tw = avail_w // cols
-        th = int(tw * 9 / 16)
-        cell_h = th + pad + 30
+        tw, th, cell_h = self._overview_layout()
 
         for i in range(len(self.slides)):
             col = i % cols
@@ -683,16 +683,38 @@ class Presenter:
             if y + cell_h < 0 or y > self.screen_h:
                 continue
 
-            # Border
+            # Border with animated pulse highlight
             if i == self.overview_selected:
                 border_color = (0, 120, 255)
+                bg_color = (0, 60, 120)
                 border_w = 4
             elif i == self.current:
                 border_color = (255, 180, 0)
+                bg_color = (120, 80, 0)
                 border_w = 3
             else:
                 border_color = (70, 70, 70)
+                bg_color = None
                 border_w = 1
+
+            # Draw animated pulse highlight for current/selected (one-off)
+            if bg_color:
+                pulse_duration = 0.6
+                if self.overview_enter_time < pulse_duration:
+                    # Pulse: start at full brightness, fade out
+                    progress = self.overview_enter_time / pulse_duration
+                    alpha = int(180 * (1.0 - progress))
+                    highlight_pad = 8
+                    pulse_surf = pygame.Surface((tw + highlight_pad * 2, th + highlight_pad * 2), pygame.SRCALPHA)
+                    pulse_color = bg_color + (alpha,)
+                    pygame.draw.rect(
+                        pulse_surf,
+                        pulse_color,
+                        (0, 0, tw + highlight_pad * 2, th + highlight_pad * 2),
+                        0,
+                        border_radius=4
+                    )
+                    self.screen.blit(pulse_surf, (x - highlight_pad, y - highlight_pad))
 
             pygame.draw.rect(
                 self.screen,
