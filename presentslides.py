@@ -329,7 +329,9 @@ class Presenter:
 
         # Pause / Play
         elif key in (pygame.K_SPACE, pygame.K_p):
-            if self.paused and self.slides[self.current]["duration"] == 0:
+            if self.blank:
+                self.blank = None
+            elif self.paused and self.slides[self.current]["duration"] == 0:
                 if self.auto_paused:
                     # Ready state: advance to next slide
                     self.auto_paused = False
@@ -907,7 +909,13 @@ class Presenter:
             self._text_with_shadow(self.font, left_str, (255, 255, 255), (16, text_y))
 
         # Center: status indicator
-        if self.auto_paused:
+        if self.blank:
+            pw = self.font.render("PAUSED", True, (0, 0, 0)).get_width()
+            self._text_with_shadow(
+                self.font, "PAUSED", (255, 200, 0),
+                ((self.screen_w - pw) // 2, text_y),
+            )
+        elif self.auto_paused:
             pw = self.font.render("WAITING", True, (0, 0, 0)).get_width()
             self._text_with_shadow(
                 self.font, "WAITING", (100, 200, 255),
