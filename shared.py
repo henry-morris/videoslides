@@ -61,6 +61,27 @@ def parse_page_range(pages_str, total_pages):
     return sorted(set(pages))
 
 
+def resolve_slides(config):
+    """Yield (slide_cfg, pdf_cache_dir, total_pages, page_numbers) for each cached slide."""
+    for slide_cfg in config["slides"]:
+        filename = slide_cfg["filename"]
+        pages_spec = slide_cfg.get("pages", "all")
+
+        pdf_file = Path(filename)
+        if not pdf_file.exists():
+            print(f"Warning: '{filename}' not found, skipping")
+            continue
+
+        pdf_cache_dir = get_pdf_cache_dir(config, pdf_file)
+        total_pages = get_cached_page_count(pdf_cache_dir)
+        if total_pages is None:
+            print(f"Warning: no cache for '{filename}', skipping")
+            continue
+
+        page_numbers = parse_page_range(pages_spec, total_pages)
+        yield slide_cfg, pdf_cache_dir, total_pages, page_numbers
+
+
 def load_config(config_file="config.toml"):
     """Load configuration from TOML file."""
     try:

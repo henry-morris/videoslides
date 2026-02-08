@@ -19,17 +19,16 @@ from pathlib import Path
 import pygame
 
 from shared import (
-    parse_page_range,
     prepare_slide_images,
     load_config,
-    get_pdf_cache_dir,
-    get_cached_page_count,
+    resolve_slides,
 )
 
 
 # Layout constants
 OVERVIEW_COLS = 8
 OVERVIEW_PADDING = 20
+OVERVIEW_HEADING_H = 75
 FONT_SIZE_INFO = 24
 FONT_SIZE_HELP = 20
 FONT_SIZE_BIG = 48
@@ -38,6 +37,15 @@ FONT_SIZE_SECTION = 30
 # Default progress bar style (used when slides don't specify their own)
 DEFAULT_PROGRESS_COLOR = (31, 67, 5)
 DEFAULT_PROGRESS_HEIGHT = 16
+
+def format_duration(seconds):
+    """Format seconds as a compact duration string like '3m 15s', '3m', or '45s'."""
+    if seconds >= 60:
+        mins = seconds // 60
+        secs = seconds % 60
+        return f"{mins}m {secs}s" if secs > 0 else f"{mins}m"
+    return f"{seconds}s"
+
 
 def color_from_str(color_str):
     """Convert a color string (hex or named) to an (R, G, B) tuple."""
@@ -52,25 +60,8 @@ def build_slide_list(config):
     """Build an ordered list of slide metadata from config, referencing cached PNGs."""
     slides = []
     prev_title = None
-    for slide_cfg in config["slides"]:
-        filename = slide_cfg["filename"]
+    for slide_cfg, pdf_cache_dir, total_pages, page_numbers in resolve_slides(config):
         duration = slide_cfg.get("duration", 15)
-        pages_spec = slide_cfg.get("pages", "all")
-
-        pdf_file = Path(filename)
-        if not pdf_file.exists():
-            print(f"Warning: '{filename}' not found, skipping")
-            continue
-
-        pdf_cache_dir = get_pdf_cache_dir(config, pdf_file)
-        total_pages = get_cached_page_count(pdf_cache_dir)
-
-        if total_pages is None:
-            print(f"Warning: no cache for '{filename}', skipping")
-            continue
-
-        page_numbers = parse_page_range(pages_spec, total_pages)
-
         show_progress_bar = slide_cfg.get("show_progress_bar", False)
         bar_color = slide_cfg.get("progress_bar_color", None)
         bar_height = slide_cfg.get("progress_bar_height", None)
@@ -89,7 +80,7 @@ def build_slide_list(config):
                     "bar_height": bar_height,
                     "title": title,
                     "show_page_number": show_page_number,
-                    "source": filename,
+                    "source": slide_cfg["filename"],
                     "page": page_num,
                     "total_pages": total_pages,
                 })
@@ -216,6 +207,12 @@ class Presenter:
         self.screen.blit(main, (sx, sy))
         return main
 
+    def _enter_present_mode(self):
+        """Switch back to presentation mode, hiding cursor if fullscreen."""
+        self.mode = self.MODE_PRESENT
+        if self.fullscreen:
+            pygame.mouse.set_visible(False)
+
     def _bar_style(self, slide):
         color = color_from_str(slide["bar_color"]) if slide["bar_color"] else DEFAULT_PROGRESS_COLOR
         height = slide["bar_height"] if slide["bar_height"] else DEFAULT_PROGRESS_HEIGHT
@@ -305,9 +302,7 @@ class Presenter:
         if self.mode == self.MODE_GOTO:
             self._key_goto(event)
         elif self.mode == self.MODE_HELP:
-            self.mode = self.MODE_PRESENT
-            if self.fullscreen:
-                pygame.mouse.set_visible(False)
+            self._enter_present_mode()
         elif self.mode == self.MODE_OVERVIEW:
             self._key_overview(event)
         else:
@@ -481,7 +476,7 @@ class Presenter:
         tw, th, cell_h = self._overview_layout()
         cols = OVERVIEW_COLS
         pad = OVERVIEW_PADDING
-        heading_h = 75
+        heading_h = OVERVIEW_HEADING_H
 
         sections = self._overview_sections()
         y_offset = pad
@@ -514,7 +509,7 @@ class Presenter:
         _, _, cell_h = self._overview_layout()
         cols = OVERVIEW_COLS
         pad = OVERVIEW_PADDING
-        heading_h = 75
+        heading_h = OVERVIEW_HEADING_H
 
         sections = self._overview_sections()
         content_h = pad
@@ -529,7 +524,7 @@ class Presenter:
 
     def _overview_ensure_visible(self):
         """Scroll to keep overview_selected on screen, with section title visible."""
-        heading_h = 75
+        heading_h = OVERVIEW_HEADING_H
         _, _, cell_h = self._overview_layout()
         _, item_top = self._overview_slide_position(self.overview_selected)
 
@@ -556,7 +551,7 @@ class Presenter:
     def _overview_ensure_visible_or_center(self):
         """Keep previous scroll if selected slide is comfortably on screen, otherwise center."""
         _, _, cell_h = self._overview_layout()
-        heading_h = 75
+        heading_h = OVERVIEW_HEADING_H
         _, item_top = self._overview_slide_position(self.overview_selected)
 
         if item_top is None:
@@ -595,16 +590,12 @@ class Presenter:
         if key in (pygame.K_ESCAPE, pygame.K_TAB, pygame.K_o):
             # Pre-scale current slide for instant display
             self._scaled_surface(self.current)
-            self.mode = self.MODE_PRESENT
-            if self.fullscreen:
-                pygame.mouse.set_visible(False)
+            self._enter_present_mode()
         elif key == pygame.K_RETURN:
             self.goto_slide(self.overview_selected)
             # Pre-scale selected slide for instant display
             self._scaled_surface(self.overview_selected)
-            self.mode = self.MODE_PRESENT
-            if self.fullscreen:
-                pygame.mouse.set_visible(False)
+            self._enter_present_mode()
         elif key == pygame.K_RIGHT:
             if self.overview_selected < len(self.slides) - 1:
                 self.overview_selected += 1
@@ -662,13 +653,9 @@ class Presenter:
                 self.goto_slide(num - 1)
             except ValueError:
                 pass
-            self.mode = self.MODE_PRESENT
-            if self.fullscreen:
-                pygame.mouse.set_visible(False)
+            self._enter_present_mode()
         elif key == pygame.K_ESCAPE:
-            self.mode = self.MODE_PRESENT
-            if self.fullscreen:
-                pygame.mouse.set_visible(False)
+            self._enter_present_mode()
         elif key == pygame.K_BACKSPACE:
             self.goto_text = self.goto_text[:-1]
         elif event.unicode.isdigit():
@@ -676,9 +663,7 @@ class Presenter:
 
     def _on_click(self, event):
         if self.mode == self.MODE_HELP:
-            self.mode = self.MODE_PRESENT
-            if self.fullscreen:
-                pygame.mouse.set_visible(False)
+            self._enter_present_mode()
         elif self.mode == self.MODE_OVERVIEW:
             self._click_overview(event)
         else:
@@ -714,21 +699,18 @@ class Presenter:
         # Navigate if releasing on the same slide we pressed
         if idx is not None and idx == self._overview_mousedown_idx:
             self.goto_slide(idx)
-            self.mode = self.MODE_PRESENT
-            if self.fullscreen:
-                pygame.mouse.set_visible(False)
+            self._enter_present_mode()
         self._overview_mousedown_idx = None
 
     def _overview_hit(self, pos):
         """Return slide index at screen position, or None."""
         mx, my = pos
-        tw, th, _ = self._overview_layout()
+        tw, th, cell_h = self._overview_layout()
 
         sections = self._overview_sections()
         cols = OVERVIEW_COLS
         pad = OVERVIEW_PADDING
-        heading_h = 75
-        cell_h = th + pad + 30
+        heading_h = OVERVIEW_HEADING_H
 
         y_offset = pad - self.overview_scroll
 
@@ -896,42 +878,23 @@ class Presenter:
             left_parts.append(f"{slide['page']}/{slide['total_pages']}")
         if slide["duration"] > 0:
             remaining = max(1, math.ceil(slide["duration"] - self.slide_time))
-            if remaining >= 60:
-                mins = remaining // 60
-                secs = remaining % 60
-                if secs > 0:
-                    left_parts.append(f"{mins}m {secs}s")
-                else:
-                    left_parts.append(f"{mins}m")
-            else:
-                left_parts.append(f"{remaining}s")
+            left_parts.append(format_duration(remaining))
         left_str = "   ".join(left_parts)
         if left_str:
             self._text_with_shadow(self.font, left_str, (255, 255, 255), (16, text_y))
 
         # Center: status indicator
-        if self.blank:
-            pw = self.font.render("PAUSED", True, (0, 0, 0)).get_width()
-            self._text_with_shadow(
-                self.font, "PAUSED", (255, 200, 0),
-                ((self.screen_w - pw) // 2, text_y),
-            )
-        elif self.auto_paused:
-            pw = self.font.render("WAITING", True, (0, 0, 0)).get_width()
-            self._text_with_shadow(
-                self.font, "WAITING", (100, 200, 255),
-                ((self.screen_w - pw) // 2, text_y),
-            )
-        elif self.paused:
-            pw = self.font.render("PAUSED", True, (0, 0, 0)).get_width()
-            self._text_with_shadow(
-                self.font, "PAUSED", (255, 200, 0),
-                ((self.screen_w - pw) // 2, text_y),
-            )
+        if self.blank or self.paused:
+            status, color = ("WAITING", (100, 200, 255)) if self.auto_paused else ("PAUSED", (255, 200, 0))
         elif self.show_info and slide["duration"] > 0:
-            pw = self.font.render("RUNNING", True, (0, 0, 0)).get_width()
+            status, color = "RUNNING", (80, 220, 100)
+        else:
+            status = None
+
+        if status:
+            pw = self.font.render(status, True, (0, 0, 0)).get_width()
             self._text_with_shadow(
-                self.font, "RUNNING", (80, 220, 100),
+                self.font, status, color,
                 ((self.screen_w - pw) // 2, text_y),
             )
 
@@ -954,7 +917,7 @@ class Presenter:
         self.screen.fill((30, 30, 30))
         cols = OVERVIEW_COLS
         pad = OVERVIEW_PADDING
-        heading_h = 75
+        heading_h = OVERVIEW_HEADING_H
 
         tw, th, cell_h = self._overview_layout()
         sections = self._overview_sections()
@@ -976,9 +939,7 @@ class Presenter:
 
                 # Calculate cumulative time up to this section
                 cumulative_time = sum(self.slides[j]["duration"] for j in range(section["start"]))
-                mins = int(cumulative_time) // 60
-                secs = int(cumulative_time) % 60
-                time_text = f"{mins}:{secs:02d}"
+                time_text = format_duration(int(cumulative_time))
                 time_surf = self.small_font.render(time_text, True, (100, 100, 100))
                 time_x = pad + title_surf.get_width() + 16
                 # Align baselines of title and time
@@ -1044,13 +1005,7 @@ class Presenter:
                 else:
                     duration = self.slides[i]["duration"]
                     if duration > 0:
-                        if duration >= 60:
-                            mins = duration // 60
-                            secs = duration % 60
-                            dur_text = f"{mins}m{secs}s" if secs > 0 else f"{mins}m"
-                        else:
-                            dur_text = f"{duration}s"
-                        label = self.small_font.render(dur_text, True, (180, 180, 180))
+                        label = self.small_font.render(format_duration(duration), True, (180, 180, 180))
                         self.screen.blit(label, (x + 4, y + th + 4))
 
             # Move past this section

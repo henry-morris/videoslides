@@ -14,14 +14,7 @@ import argparse
 import os
 from moviepy import ImageClip, concatenate_videoclips, CompositeVideoClip, VideoClip
 
-from shared import (
-    get_cache_root,
-    get_pdf_cache_dir,
-    get_cached_page_count,
-    parse_page_range,
-    load_config,
-    prepare_slide_images,
-)
+from shared import load_config, prepare_slide_images, resolve_slides
 
 
 def create_progress_bar_clip(width, height, duration, progress_color="white", bar_height=10):
@@ -47,43 +40,20 @@ def create_progress_bar_clip(width, height, duration, progress_color="white", ba
 
 def pngs_to_video(config):
     """Convert PNG images to video (MP4 or MKV)."""
-    cache_root = get_cache_root(config)
-    output_format = config["settings"].get("output_format", "mp4").lower()
-
-    # Set default filename based on format
-    default_filename = f"presentation.{output_format}"
-    output_filename = config["settings"].get("output_video", default_filename)
+    output_filename = config["settings"].get("output_video", "presentation.mkv")
 
     fps = config["settings"].get("fps", 5)
     keyframe_seconds = config["settings"].get("keyframe_interval", 15)
     resolution = config["settings"].get("resolution", [1920, 1080])
 
-    print(f"🎥 Starting PNG → {output_format.upper()} conversion...")
+    output_ext = Path(output_filename).suffix.lstrip(".").upper()
+    print(f"🎥 Starting PNG → {output_ext} conversion...")
 
     clips = []
-    for order, slide in enumerate(config["slides"], start=1):
-        filename = slide["filename"]
+    for slide, pdf_cache_dir, total_pages, page_numbers in resolve_slides(config):
         duration = slide.get("duration", 15) or 15
-        pages_spec = slide.get("pages", "all")
 
-        pdf_file = Path(filename)
-        if not pdf_file.exists():
-            print(f"⚠️ Skipping '{filename}' - file not found")
-            continue
-
-        # Get cached PNGs
-        pdf_cache_dir = get_pdf_cache_dir(config, pdf_file)
-        total_pages = get_cached_page_count(pdf_cache_dir)
-
-        if total_pages is None:
-            print(f"⚠️ No cache found for '{filename}' - run PDF processing first")
-            continue
-
-        print(f"🎬 Processing '{filename}' (order={order}, duration={duration}s, pages={pages_spec})...")
-
-        # Parse which pages to include
-        page_numbers = parse_page_range(pages_spec, total_pages)
-        print(f"📋 Using pages: {page_numbers}")
+        print(f"🎬 Processing '{slide['filename']}' (duration={duration}s, pages={page_numbers})...")
 
         # Check if this slide should have a progress bar
         show_progress_bar = slide.get("show_progress_bar", False)
@@ -133,21 +103,13 @@ def pngs_to_video(config):
         # Set codec and keyframe interval based on format
         keyframe_interval = fps * keyframe_seconds
 
-        if output_format == "mkv":
-            final.write_videofile(
-                output_filename,
-                fps=fps,
-                threads=None,
-                codec='libx264',
-                ffmpeg_params=['-g', str(keyframe_interval), '-keyint_min', str(keyframe_interval), '-sc_threshold', '0']
-            )
-        else:
-            final.write_videofile(
-                output_filename,
-                fps=fps,
-                threads=None,
-                ffmpeg_params=['-g', str(keyframe_interval), '-keyint_min', str(keyframe_interval), '-sc_threshold', '0']
-            )
+        final.write_videofile(
+            output_filename,
+            fps=fps,
+            threads=None,
+            codec='libx264',
+            ffmpeg_params=['-g', str(keyframe_interval), '-keyint_min', str(keyframe_interval), '-sc_threshold', '0']
+        )
 
         print(f"✅ Video saved as '{output_filename}'")
     else:
