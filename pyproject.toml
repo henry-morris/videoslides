@@ -5,7 +5,7 @@ description = "Convert PDF presentations to video with configurable slide order 
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "pdf2image>=1.17.0",
+    "PyMuPDF>=1.23.0",
     "Pillow>=10.0.0",
     "moviepy>=1.0.3",
     "pygame>=2.5.0",

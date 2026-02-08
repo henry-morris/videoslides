@@ -4,7 +4,7 @@
 # requires_python = "==3.11.*"
 # dependencies = [
 #   "pygame",
-#   "pdf2image",
+#   "PyMuPDF",
 #   "Pillow",
 # ]
 # ///

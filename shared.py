@@ -3,7 +3,7 @@
 from pathlib import Path
 import hashlib
 import tomllib
-from pdf2image import convert_from_path, pdfinfo_from_path
+import fitz  # PyMuPDF
 from PIL import Image
 
 
@@ -107,7 +107,6 @@ def pdfs_to_pngs(config, target_width=1920, target_height=1080):
     cache_root = get_cache_root(config)
     cache_root.mkdir(parents=True, exist_ok=True)
 
-    pdf_threads = config["settings"].get("pdf_threads", 4)
     background_color = config["settings"].get("background_color", "black")
 
     print("🧩 Starting PDF → PNG conversion from config...")
@@ -141,33 +140,36 @@ def pdfs_to_pngs(config, target_width=1920, target_height=1080):
             # Create temporary directory
             pdf_temp_dir.mkdir(exist_ok=True)
 
-            # Get page count, then convert one page at a time for progress
-            total_pages = pdfinfo_from_path(pdf_file)["Pages"]
+            doc = fitz.open(pdf_file)
+            total_pages = len(doc)
             print(f"🔄 Rendering {total_pages} page(s)...")
 
-            for page_idx in range(1, total_pages + 1):
-                print(f"🔧 Rendering page {page_idx}/{total_pages}...")
-                page = convert_from_path(
-                    pdf_file, fmt="png", thread_count=pdf_threads,
-                    first_page=page_idx, last_page=page_idx,
-                    size=(target_width, None),
-                )[0]
+            for page_idx in range(total_pages):
+                print(f"🔧 Rendering page {page_idx + 1}/{total_pages}...")
+                page = doc[page_idx]
 
-                img = page.convert("RGB")
-                w, h = img.size
+                # Scale to fit target width while preserving aspect ratio
+                zoom = target_width / page.rect.width
+                mat = fitz.Matrix(zoom, zoom)
+                pix = page.get_pixmap(matrix=mat)
 
-                scale = min(target_width / w, target_height / h)
-                new_size = (int(w * scale), int(h * scale))
-                img = img.resize(new_size, Image.LANCZOS)
+                img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+
+                # Letterbox onto target resolution background
+                scale = min(target_width / img.width, target_height / img.height)
+                new_size = (int(img.width * scale), int(img.height * scale))
+                if new_size != img.size:
+                    img = img.resize(new_size, Image.LANCZOS)
 
                 background = Image.new("RGB", (target_width, target_height), background_color)
                 left = (target_width - new_size[0]) // 2
                 top = (target_height - new_size[1]) // 2
                 background.paste(img, (left, top))
 
-                # Save to temporary directory
-                temp_png = pdf_temp_dir / f"{page_idx:03d}.png"
+                temp_png = pdf_temp_dir / f"{page_idx + 1:03d}.png"
                 background.save(temp_png, "PNG")
+
+            doc.close()
 
             # Atomically move temporary directory to final location
             pdf_temp_dir.rename(pdf_cache_dir)
