@@ -5,7 +5,6 @@
 # dependencies = [
 #   "pygame",
 #   "PyMuPDF",
-#   "Pillow",
 # ]
 # ///
 

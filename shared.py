@@ -4,7 +4,17 @@ from pathlib import Path
 import hashlib
 import tomllib
 import fitz  # PyMuPDF
-from PIL import Image
+
+
+def parse_color(color_str):
+    """Convert a color string ('black', 'white', or '#rrggbb') to an RGB tuple."""
+    named = {"black": (0, 0, 0), "white": (255, 255, 255)}
+    if color_str in named:
+        return named[color_str]
+    if color_str.startswith("#") and len(color_str) == 7:
+        h = color_str[1:]
+        return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
+    return (0, 0, 0)
 
 
 def calculate_pdf_hash(pdf_path):
@@ -144,30 +154,33 @@ def pdfs_to_pngs(config, target_width=1920, target_height=1080):
             total_pages = len(doc)
             print(f"🔄 Rendering {total_pages} page(s)...")
 
+            bg_rgb = parse_color(background_color)
+
             for page_idx in range(total_pages):
                 print(f"🔧 Rendering page {page_idx + 1}/{total_pages}...")
                 page = doc[page_idx]
 
-                # Scale to fit target width while preserving aspect ratio
-                zoom = target_width / page.rect.width
+                # Scale to fit within target while preserving aspect ratio
+                zoom = min(target_width / page.rect.width, target_height / page.rect.height)
                 mat = fitz.Matrix(zoom, zoom)
                 pix = page.get_pixmap(matrix=mat)
 
-                img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+                # Letterbox: create target-sized pixmap with background color
+                bg = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, target_width, target_height), 0)
+                bg.set_rect(bg.irect, bg_rgb)
 
-                # Letterbox onto target resolution background
-                scale = min(target_width / img.width, target_height / img.height)
-                new_size = (int(img.width * scale), int(img.height * scale))
-                if new_size != img.size:
-                    img = img.resize(new_size, Image.LANCZOS)
-
-                background = Image.new("RGB", (target_width, target_height), background_color)
-                left = (target_width - new_size[0]) // 2
-                top = (target_height - new_size[1]) // 2
-                background.paste(img, (left, top))
+                # Copy rendered page into center
+                left = (target_width - pix.width) // 2
+                top = (target_height - pix.height) // 2
+                src = pix.samples_mv
+                dst = bg.samples_mv
+                for y in range(pix.height):
+                    s = y * pix.stride
+                    d = (top + y) * bg.stride + left * 3
+                    dst[d:d + pix.width * 3] = src[s:s + pix.width * 3]
 
                 temp_png = pdf_temp_dir / f"{page_idx + 1:03d}.png"
-                background.save(temp_png, "PNG")
+                bg.save(str(temp_png))
 
             doc.close()
 

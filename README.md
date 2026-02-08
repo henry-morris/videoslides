@@ -20,10 +20,6 @@ uv pip install -e .
 ### System Requirements
 
 - Python 3.11+
-- poppler-utils (for pdf2image)
-  - macOS: `brew install poppler`
-  - Ubuntu: `sudo apt-get install poppler-utils`
-  - Windows: Download from https://blog.alivate.com.au/poppler-windows/
 
 ## Quick Start
 
@@ -51,13 +47,11 @@ Create a `config.toml` in your slides directory. The `[settings]` section is opt
 ```toml
 [settings]
 output_cache = "~/.cache/videoslides"  # default
-output_video = "presentation.mp4"      # default
-output_format = "mp4"        # "mp4" or "mkv"
+output_video = "presentation.mkv"  # default; .mp4 also works
 resolution = [1920, 1080]    # default
 fps = 5                      # default (videoslides only)
 keyframe_interval = 15       # default, seconds (videoslides only)
 background_color = "black"   # default
-pdf_threads = 4              # default
 
 [[slides]]
 filename = "intro.pdf"
@@ -88,13 +82,11 @@ title = "Summary"
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `output_cache` | `~/.cache/videoslides` | Directory for cached PNG files |
-| `output_video` | `presentation.mp4` | Output video filename (videoslides) |
-| `output_format` | `mp4` | `mp4` or `mkv` (videoslides) |
+| `output_video` | `presentation.mkv` | Output video filename; .mp4 also works (videoslides) |
 | `resolution` | `[1920, 1080]` | Slide resolution |
 | `fps` | `5` | Video frame rate (videoslides) |
 | `keyframe_interval` | `15` | Seconds between keyframes (videoslides) |
 | `background_color` | `black` | Letterbox fill color |
-| `pdf_threads` | `4` | Threads for PDF rendering |
 
 ### Slide Options
 
@@ -179,10 +171,9 @@ Both tools use the same PNG cache (`~/.cache/videoslides/` by default). PDFs are
 
 ## Dependencies
 
-- **pdf2image** + **Pillow** -- PDF to PNG conversion and image processing
+- **PyMuPDF** -- PDF rendering
 - **moviepy** -- video encoding (videoslides)
 - **pygame** -- interactive display (presentslides)
-- **PyPDF2** -- PDF utilities
 
 ## License
 

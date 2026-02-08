@@ -5,35 +5,46 @@
 # dependencies = [
 #   "moviepy",
 #   "PyMuPDF",
-#   "Pillow",
 # ]
 # ///
 
 from pathlib import Path
 import argparse
 import os
+import numpy as np
 from moviepy import ImageClip, concatenate_videoclips, CompositeVideoClip, VideoClip
 
 from shared import load_config, prepare_slide_images, resolve_slides
 
 
+def _parse_color_to_rgb(color_str):
+    """Convert a color string to an (R, G, B) tuple for numpy."""
+    named = {
+        "white": (255, 255, 255), "black": (0, 0, 0),
+        "red": (255, 0, 0), "green": (0, 128, 0), "blue": (0, 0, 255),
+    }
+    if color_str in named:
+        return named[color_str]
+    if color_str.startswith("#") and len(color_str) == 7:
+        h = color_str[1:]
+        return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
+    return (255, 255, 255)
+
+
 def create_progress_bar_clip(width, height, duration, progress_color="white", bar_height=10):
     """Create a progress bar clip that fills from left to right over the duration."""
-    import numpy as np
-    from PIL import Image
+    rgb = _parse_color_to_rgb(progress_color)
 
     def make_frame(t):
-        # Calculate progress width (0 to full width)
         progress = min(t / duration, 1.0)
         progress_width = int(width * progress)
 
         if progress_width == 0:
-            # Return empty frame if no progress yet
             return np.zeros((bar_height, 1, 3), dtype=np.uint8)
 
-        # Create image only as wide as the progress
-        img = Image.new("RGB", (progress_width, bar_height), progress_color)
-        return np.array(img)
+        frame = np.empty((bar_height, progress_width, 3), dtype=np.uint8)
+        frame[:, :] = rgb
+        return frame
 
     return VideoClip(make_frame, duration=duration)
 
@@ -64,7 +75,7 @@ def pngs_to_video(config):
             cached_png = pdf_cache_dir / f"{page_num:03d}.png"
 
             if not cached_png.exists():
-                print(f"⚠️ Page {page_num} not found in cache for '{filename}', skipping")
+                print(f"⚠️ Page {page_num} not found in cache for '{slide['filename']}', skipping")
                 continue
 
             print(f"🎞️ Adding page {page_num} ({duration}s)")

@@ -8,7 +8,6 @@ resolution = [1920, 1080]
 fps = 5
 keyframe_interval = 15
 background_color = "black"
-pdf_threads = 4
 
 # Define slides in the order they should appear in the video
 # Each slide specifies:
