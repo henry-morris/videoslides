@@ -3,7 +3,7 @@
 from pathlib import Path
 import hashlib
 import tomllib
-from pdf2image import convert_from_path
+from pdf2image import convert_from_path, pdfinfo_from_path
 from PIL import Image
 
 
@@ -141,13 +141,17 @@ def pdfs_to_pngs(config, target_width=1920, target_height=1080):
             # Create temporary directory
             pdf_temp_dir.mkdir(exist_ok=True)
 
-            # Convert all pages to temporary directory
-            pages = convert_from_path(pdf_file, fmt="png", thread_count=pdf_threads)
-            total_pages = len(pages)
-            print(f"🔄 Rendering all {total_pages} page(s)...")
+            # Get page count, then convert one page at a time for progress
+            total_pages = pdfinfo_from_path(pdf_file)["Pages"]
+            print(f"🔄 Rendering {total_pages} page(s)...")
 
-            for page_idx, page in enumerate(pages, start=1):
-                print(f"🔧 Processing page {page_idx}/{total_pages}...")
+            for page_idx in range(1, total_pages + 1):
+                print(f"🔧 Rendering page {page_idx}/{total_pages}...")
+                page = convert_from_path(
+                    pdf_file, fmt="png", thread_count=pdf_threads,
+                    first_page=page_idx, last_page=page_idx,
+                    size=(target_width, None),
+                )[0]
 
                 img = page.convert("RGB")
                 w, h = img.size
