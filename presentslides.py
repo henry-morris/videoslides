@@ -968,8 +968,8 @@ class Presenter:
                 title_y = heading_y + 22
                 self.screen.blit(title_surf, (pad, title_y))
 
-                # Calculate cumulative time up to this section
-                cumulative_time = sum(self.slides[j]["duration"] for j in range(section["start"]))
+                # Calculate total duration of this section
+                cumulative_time = sum(self.slides[j]["duration"] for j in range(section["start"], section["end"]))
                 time_text = format_duration(int(cumulative_time))
                 time_surf = self.small_font.render(time_text, True, (100, 100, 100))
                 time_x = pad + title_surf.get_width() + 16
