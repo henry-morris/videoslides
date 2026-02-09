@@ -75,6 +75,13 @@ filename = "conclusion.pdf"
 duration = 8
 pages = "2"
 title = "Summary"
+show_countdown = true
+
+[[slides]]
+filename = "break.pdf"
+end_time = "18:30"
+title = "Break"
+show_countdown = true
 ```
 
 ### Settings Reference
@@ -102,6 +109,8 @@ Each `[[slides]]` entry supports:
 | `show_progress_bar` | `false` | Animated progress bar at the bottom of the slide |
 | `progress_bar_color` | white (presenter) / `#1f4305` (video) | Bar color, hex or named |
 | `progress_bar_height` | `6` (presenter) / `16` (video) | Bar height in pixels |
+| `show_countdown` | `false` | Show time remaining centred at the bottom instead of a progress bar (presentslides) |
+| `end_time` | *(none)* | Wall clock deadline in `"HH:MM"` 24-hour format; slide counts down to this time and auto-advances when reached (presentslides) |
 
 ### Page Range Syntax
 

@@ -11,6 +11,7 @@
 """Interactive slide presenter - reads VideoSlides config files."""
 
 import argparse
+import datetime
 import math
 import os
 from pathlib import Path
@@ -69,6 +70,7 @@ def build_slide_list(config):
         prev_title = title
         show_page_number = slide_cfg.get("show_page_number", False)
         show_countdown = slide_cfg.get("show_countdown", False)
+        end_time = slide_cfg.get("end_time", None)  # "HH:MM" wall clock
 
         for page_num in page_numbers:
             cached_png = pdf_cache_dir / f"{page_num:03d}.png"
@@ -82,6 +84,7 @@ def build_slide_list(config):
                     "title": title,
                     "show_page_number": show_page_number,
                     "show_countdown": show_countdown,
+                    "end_time": end_time,
                     "source": slide_cfg["filename"],
                     "page": page_num,
                     "total_pages": total_pages,
@@ -118,6 +121,7 @@ class Presenter:
         self.overview_selected = 0
         self.overview_scroll = 0
         self.overview_preferred_col = 0  # Remember column position for up/down navigation
+        self._end_time_duration = 0  # Total duration when entering an end_time slide
         self._sections_cache = None
         self._overview_mousedown_idx = None
         self._overview_thumb_cache = {}
@@ -216,6 +220,21 @@ class Presenter:
         if self.fullscreen:
             pygame.mouse.set_visible(False)
 
+    def _end_time_remaining(self, slide):
+        """Seconds remaining until the slide's end_time, or None if not an end_time slide."""
+        if not slide["end_time"]:
+            return None
+        h, m = map(int, slide["end_time"].split(":"))
+        now = datetime.datetime.now()
+        target = now.replace(hour=h, minute=m, second=0, microsecond=0)
+        return max(0, (target - now).total_seconds())
+
+    def _init_end_time(self):
+        """Record initial duration when entering an end_time slide."""
+        slide = self.slides[self.current]
+        remaining = self._end_time_remaining(slide)
+        self._end_time_duration = remaining if remaining is not None else 0
+
     def _bar_style(self, slide):
         color = color_from_str(slide["bar_color"]) if slide["bar_color"] else DEFAULT_PROGRESS_COLOR
         height = slide["bar_height"] if slide["bar_height"] else DEFAULT_PROGRESS_HEIGHT
@@ -238,6 +257,7 @@ class Presenter:
             self.current += 1
             self.slide_time = 0.0
             self.blank = None
+            self._init_end_time()
 
     def prev_slide(self):
         if self.current > 0:
@@ -245,6 +265,7 @@ class Presenter:
             self.current -= 1
             self.slide_time = 0.0
             self.blank = None
+            self._init_end_time()
 
     def goto_slide(self, index):
         index = max(0, min(index, len(self.slides) - 1))
@@ -253,6 +274,7 @@ class Presenter:
         self.current = index
         self.slide_time = 0.0
         self.blank = None
+        self._init_end_time()
 
     def toggle_fullscreen(self):
         self.fullscreen = not self.fullscreen
@@ -771,7 +793,28 @@ class Presenter:
         if self.paused or self.blank:
             return
 
-        duration = self.slides[self.current]["duration"]
+        slide = self.slides[self.current]
+
+        # End-time slide: wall clock countdown
+        remaining = self._end_time_remaining(slide)
+        if remaining is not None:
+            if remaining <= 0:
+                if self._end_time_duration > 0:
+                    # Time just ran out during live countdown: advance
+                    if self.current < len(self.slides) - 1:
+                        self.current += 1
+                        self.slide_time = 0.0
+                        self._init_end_time()
+                    else:
+                        self.paused = True
+                else:
+                    # Arrived after time already passed: behave like duration-0
+                    if not self.paused:
+                        self.paused = True
+                        self.auto_paused = True
+            return
+
+        duration = slide["duration"]
 
         # Pause-only slide: auto-pause on arrival (only if not already user-paused)
         if duration == 0:
@@ -786,6 +829,7 @@ class Presenter:
             if self.current < len(self.slides) - 1:
                 self.current += 1
                 self.slide_time = 0.0
+                self._init_end_time()
             else:
                 self.slide_time = duration
                 self.paused = True
@@ -834,10 +878,29 @@ class Presenter:
         # Info overlay
         self._draw_info()
 
+    def _slide_remaining(self, slide):
+        """Seconds remaining on the current slide (wall clock or duration-based)."""
+        end_remaining = self._end_time_remaining(slide)
+        if end_remaining is not None:
+            return end_remaining
+        if slide["duration"] <= 0:
+            return 0
+        return max(0, slide["duration"] - self.slide_time)
+
+    def _slide_progress(self, slide):
+        """Progress fraction (0..1) for the current slide."""
+        end_remaining = self._end_time_remaining(slide)
+        if end_remaining is not None:
+            if self._end_time_duration > 0:
+                return 1.0 - end_remaining / self._end_time_duration
+            return 1.0
+        if slide["duration"] > 0:
+            return min(self.slide_time / slide["duration"], 1.0)
+        return 1.0
+
     def _draw_progress_bar(self):
         slide = self.slides[self.current]
-        duration = slide["duration"]
-        progress = min(self.slide_time / duration, 1.0) if duration > 0 else 1.0
+        progress = self._slide_progress(slide)
 
         color, height = self._bar_style(slide)
         bar_y = self.screen_h - height - 20
@@ -849,11 +912,10 @@ class Presenter:
 
     def _draw_countdown(self):
         slide = self.slides[self.current]
-        duration = slide["duration"]
-        if duration <= 0:
+        remaining = self._slide_remaining(slide)
+        if remaining <= 0:
             return
-        remaining = max(1, math.ceil(duration - self.slide_time))
-        text = format_duration(remaining)
+        text = format_duration(max(1, math.ceil(remaining)))
 
         text_h = self.countdown_font.render("Xg", True, (255, 255, 255)).get_height()
         bar_h = text_h + 16
@@ -907,9 +969,9 @@ class Presenter:
             left_parts.append(slide["title"])
         if slide.get("show_page_number"):
             left_parts.append(f"{slide['page']}/{slide['total_pages']}")
-        if slide["duration"] > 0:
-            remaining = max(1, math.ceil(slide["duration"] - self.slide_time))
-            left_parts.append(format_duration(remaining))
+        remaining = self._slide_remaining(slide)
+        if remaining > 0:
+            left_parts.append(format_duration(max(1, math.ceil(remaining))))
         left_str = "   ".join(left_parts)
         if left_str:
             self._text_with_shadow(self.font, left_str, (255, 255, 255), (16, text_y))
@@ -917,7 +979,7 @@ class Presenter:
         # Center: status indicator
         if self.blank or self.paused:
             status, color = ("WAITING", (100, 200, 255)) if self.auto_paused else ("PAUSED", (255, 200, 0))
-        elif self.show_info and slide["duration"] > 0:
+        elif self.show_info and (slide["duration"] > 0 or slide["end_time"]):
             status, color = "RUNNING", (80, 220, 100)
         else:
             status = None
@@ -1158,6 +1220,7 @@ class Presenter:
 
     def run(self):
         self.init_pygame()
+        self._init_end_time()
 
         while self.running:
             dt = self.clock.tick(60) / 1000.0
