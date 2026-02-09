@@ -644,6 +644,8 @@ class Presenter:
                 if new_idx is not None:
                     self.overview_selected = new_idx
             self._overview_ensure_visible()
+        elif key in (pygame.K_f, pygame.K_F11):
+            self.toggle_fullscreen()
         elif key == pygame.K_q:
             self.running = False
 
