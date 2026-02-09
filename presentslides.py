@@ -31,6 +31,7 @@ OVERVIEW_HEADING_H = 75
 FONT_SIZE_INFO = 24
 FONT_SIZE_HELP = 20
 FONT_SIZE_BIG = 48
+FONT_SIZE_COUNTDOWN = 36
 FONT_SIZE_SECTION = 30
 
 # Default progress bar style (used when slides don't specify their own)
@@ -67,6 +68,7 @@ def build_slide_list(config):
         title = slide_cfg.get("title", prev_title)
         prev_title = title
         show_page_number = slide_cfg.get("show_page_number", False)
+        show_countdown = slide_cfg.get("show_countdown", False)
 
         for page_num in page_numbers:
             cached_png = pdf_cache_dir / f"{page_num:03d}.png"
@@ -79,6 +81,7 @@ def build_slide_list(config):
                     "bar_height": bar_height,
                     "title": title,
                     "show_page_number": show_page_number,
+                    "show_countdown": show_countdown,
                     "source": slide_cfg["filename"],
                     "page": page_num,
                     "total_pages": total_pages,
@@ -165,6 +168,7 @@ class Presenter:
         self.font = pygame.font.SysFont("sans", FONT_SIZE_INFO)
         self.small_font = pygame.font.SysFont("sans", FONT_SIZE_HELP)
         self.big_font = pygame.font.SysFont("sans", FONT_SIZE_BIG)
+        self.countdown_font = pygame.font.SysFont("sans", FONT_SIZE_COUNTDOWN)
         self.section_font = pygame.font.SysFont("sans", FONT_SIZE_SECTION)
 
         self._load_images()
@@ -817,8 +821,12 @@ class Presenter:
         y = (self.screen_h - surf.get_height()) // 2
         self.screen.blit(surf, (x, y))
 
-        # Progress bar (only when config enables it)
-        if self.slides[self.current]["show_progress_bar"]:
+        slide = self.slides[self.current]
+
+        # Progress bar or countdown (mutually exclusive; countdown wins)
+        if slide["show_countdown"]:
+            self._draw_countdown()
+        elif slide["show_progress_bar"]:
             self._draw_progress_bar()
 
         # Info overlay
@@ -836,6 +844,28 @@ class Presenter:
         fill_w = int(self.screen_w * progress)
         if fill_w > 0:
             pygame.draw.rect(self.screen, color, (0, bar_y, fill_w, height))
+
+    def _draw_countdown(self):
+        slide = self.slides[self.current]
+        duration = slide["duration"]
+        if duration <= 0:
+            return
+        remaining = max(1, math.ceil(duration - self.slide_time))
+        text = format_duration(remaining)
+
+        text_h = self.countdown_font.render("Xg", True, (255, 255, 255)).get_height()
+        bar_h = text_h + 16
+        bar_y = self.screen_h - bar_h
+
+        bg = pygame.Surface((self.screen_w, bar_h), pygame.SRCALPHA)
+        bg.fill((0, 0, 0, 140))
+        self.screen.blit(bg, (0, bar_y))
+
+        text_y = bar_y + (bar_h - text_h) // 2
+        self._text_with_shadow(
+            self.countdown_font, text, (255, 255, 255),
+            ((self.screen_w - self.countdown_font.size(text)[0]) // 2, text_y),
+        )
 
     def _presentation_position(self):
         """Elapsed presentation time based on slide positions + current slide progress."""
