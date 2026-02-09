@@ -96,11 +96,51 @@ def load_config(config_file="config.toml"):
     """Load configuration from TOML file."""
     try:
         with open(config_file, "rb") as f:
-            return tomllib.load(f)
+            config = tomllib.load(f)
     except FileNotFoundError:
         raise RuntimeError(f"Config file '{config_file}' not found")
     except tomllib.TOMLDecodeError as e:
         raise RuntimeError(f"Invalid TOML in '{config_file}': {e}")
+
+    # -- Config validation --
+
+    if "slides" not in config or not config["slides"]:
+        raise RuntimeError("Config must contain at least one [[slides]] entry")
+
+    KNOWN_SETTINGS = {
+        "output_cache", "output_video", "resolution", "fps",
+        "keyframe_interval", "background_color",
+    }
+    KNOWN_SLIDE_KEYS = {
+        "filename", "duration", "until", "pages", "title",
+        "show_page_number", "show_progress_bar", "show_countdown",
+        "progress_bar_color", "progress_bar_height",
+    }
+
+    for key in config.get("settings", {}):
+        if key not in KNOWN_SETTINGS:
+            raise RuntimeError(f"Unknown setting '{key}'")
+
+    res = config.get("settings", {}).get("resolution")
+    if res is not None:
+        if not (isinstance(res, list) and len(res) == 2
+                and all(isinstance(v, int) and v > 0 for v in res)):
+            raise RuntimeError(f"'resolution' must be [width, height], got {res}")
+
+    for i, slide in enumerate(config["slides"], 1):
+        label = f"Slide {i} ('{slide.get('filename', '?')}')"
+
+        for key in slide:
+            if key not in KNOWN_SLIDE_KEYS:
+                raise RuntimeError(f"{label}: unknown option '{key}'")
+
+        if "duration" in slide and "until" in slide:
+            raise RuntimeError(f"{label}: 'duration' and 'until' are mutually exclusive")
+
+        if "duration" in slide and slide["duration"] < 0:
+            raise RuntimeError(f"{label}: 'duration' must be non-negative, got {slide['duration']!r}")
+
+    return config
 
 
 def prepare_slide_images(config):

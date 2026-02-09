@@ -79,9 +79,14 @@ show_countdown = true
 
 [[slides]]
 filename = "break.pdf"
-end_time = "18:30"
+until = "18:30"
 title = "Break"
 show_countdown = true
+
+# Pause-only slide: omit both duration and until
+[[slides]]
+filename = "qa.pdf"
+title = "Q&A"
 ```
 
 ### Settings Reference
@@ -102,7 +107,8 @@ Each `[[slides]]` entry supports:
 | Option | Default | Description |
 |--------|---------|-------------|
 | `filename` | *(required)* | PDF file path |
-| `duration` | `15` | Seconds per page. `0` = pause-only (presentslides pauses on arrival; unpause to advance) |
+| `duration` | *(none)* | Seconds per page. Mutually exclusive with `until`. Omit both for a pause-only slide (presentslides pauses on arrival; unpause to advance). Default `15` for videoslides. |
+| `until` | *(none)* | Wall clock deadline in `"HH:MM"` 24-hour format; slide counts down to this time and auto-advances when reached. Mutually exclusive with `duration`. (presentslides) |
 | `pages` | `all` | Page selection (see below) |
 | `title` | *(inherited)* | Short label shown on the presenter info bar. Carries forward to subsequent sections until changed. |
 | `show_page_number` | `false` | Show PDF page number on the presenter info bar |
@@ -110,7 +116,6 @@ Each `[[slides]]` entry supports:
 | `progress_bar_color` | white (presenter) / `#1f4305` (video) | Bar color, hex or named |
 | `progress_bar_height` | `6` (presenter) / `16` (video) | Bar height in pixels |
 | `show_countdown` | `false` | Show time remaining centred at the bottom instead of a progress bar (presentslides) |
-| `end_time` | *(none)* | Wall clock deadline in `"HH:MM"` 24-hour format; slide counts down to this time and auto-advances when reached (presentslides) |
 
 ### Page Range Syntax
 

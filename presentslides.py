@@ -62,7 +62,12 @@ def build_slide_list(config):
     slides = []
     prev_title = None
     for slide_cfg, pdf_cache_dir, total_pages, page_numbers in resolve_slides(config):
-        duration = slide_cfg.get("duration", 15)
+        until = slide_cfg.get("until", None)  # "HH:MM" wall clock
+        duration = slide_cfg.get("duration", None)
+        if until:
+            duration = duration or 0
+        elif duration is None:
+            duration = 0  # no duration and no until = pause-only
         show_progress_bar = slide_cfg.get("show_progress_bar", False)
         bar_color = slide_cfg.get("progress_bar_color", None)
         bar_height = slide_cfg.get("progress_bar_height", None)
@@ -70,7 +75,6 @@ def build_slide_list(config):
         prev_title = title
         show_page_number = slide_cfg.get("show_page_number", False)
         show_countdown = slide_cfg.get("show_countdown", False)
-        end_time = slide_cfg.get("end_time", None)  # "HH:MM" wall clock
 
         for page_num in page_numbers:
             cached_png = pdf_cache_dir / f"{page_num:03d}.png"
@@ -84,7 +88,7 @@ def build_slide_list(config):
                     "title": title,
                     "show_page_number": show_page_number,
                     "show_countdown": show_countdown,
-                    "end_time": end_time,
+                    "until": until,
                     "source": slide_cfg["filename"],
                     "page": page_num,
                     "total_pages": total_pages,
@@ -121,7 +125,7 @@ class Presenter:
         self.overview_selected = 0
         self.overview_scroll = 0
         self.overview_preferred_col = 0  # Remember column position for up/down navigation
-        self._end_time_duration = 0  # Total duration when entering an end_time slide
+        self._end_time_duration = 0  # Total duration when entering an 'until' slide
         self._sections_cache = None
         self._overview_mousedown_idx = None
         self._overview_thumb_cache = {}
@@ -221,16 +225,16 @@ class Presenter:
             pygame.mouse.set_visible(False)
 
     def _end_time_remaining(self, slide):
-        """Seconds remaining until the slide's end_time, or None if not an end_time slide."""
-        if not slide["end_time"]:
+        """Seconds remaining until the slide's 'until' time, or None if not set."""
+        if not slide["until"]:
             return None
-        h, m = map(int, slide["end_time"].split(":"))
+        h, m = map(int, slide["until"].split(":"))
         now = datetime.datetime.now()
         target = now.replace(hour=h, minute=m, second=0, microsecond=0)
         return max(0, (target - now).total_seconds())
 
     def _init_end_time(self):
-        """Record initial duration when entering an end_time slide."""
+        """Record initial duration when entering an 'until' slide."""
         slide = self.slides[self.current]
         remaining = self._end_time_remaining(slide)
         self._end_time_duration = remaining if remaining is not None else 0
@@ -795,7 +799,7 @@ class Presenter:
 
         slide = self.slides[self.current]
 
-        # End-time slide: wall clock countdown
+        # 'until' slide: wall clock countdown
         remaining = self._end_time_remaining(slide)
         if remaining is not None:
             if remaining <= 0:
@@ -979,7 +983,7 @@ class Presenter:
         # Center: status indicator
         if self.blank or self.paused:
             status, color = ("WAITING", (100, 200, 255)) if self.auto_paused else ("PAUSED", (255, 200, 0))
-        elif self.show_info and (slide["duration"] > 0 or slide["end_time"]):
+        elif self.show_info and (slide["duration"] > 0 or slide["until"]):
             status, color = "RUNNING", (80, 220, 100)
         else:
             status = None
