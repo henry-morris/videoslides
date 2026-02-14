@@ -1095,20 +1095,66 @@ class Presenter:
                 thumb = self._overview_thumb_cache[cache_key]
                 self.screen.blit(thumb, (x, y))
 
-                # Below thumbnail: page number or duration (not both)
-                if self.slides[i].get("show_page_number"):
-                    label = self.small_font.render(str(self.slides[i]["page"]), True, (180, 180, 180))
-                    self.screen.blit(label, (x + 4, y + th + 4))
+                # Below thumbnail: timing left, page number right
+                slide = self.slides[i]
+                until = slide.get("until")
+                if until:
+                    timing = until
                 else:
-                    duration = self.slides[i]["duration"]
-                    if duration > 0:
-                        label = self.small_font.render(format_duration(duration), True, (180, 180, 180))
-                        self.screen.blit(label, (x + 4, y + th + 4))
+                    duration = slide["duration"]
+                    timing = format_duration(int(duration)) if duration > 0 else None
+                if timing:
+                    timing_surf = self.small_font.render(timing, True, (180, 180, 180))
+                    self.screen.blit(timing_surf, (x + 4, y + th + 4))
+
+                if slide.get("show_page_number"):
+                    page_text = f"{slide['page']}/{slide['total_pages']}"
+                    page_surf = self.small_font.render(page_text, True, (180, 180, 180))
+                    self.screen.blit(page_surf, (x + tw - page_surf.get_width() - 4, y + th + 4))
+
+                self._draw_thumbnail_overlays(slide, x, y, tw, th)
 
             # Move past this section
             section_slides = section["end"] - section["start"]
             rows_in_section = (section_slides + cols - 1) // cols
             y_offset += rows_in_section * cell_h
+
+    def _draw_thumbnail_overlays(self, slide, x, y, tw, th):
+        """Draw a clock or progress-bar indicator in the label strip below a thumbnail.
+        countdown and progress_bar are mutually exclusive; countdown takes priority."""
+        MARGIN = 4
+        CLOCK_R = 9
+        BAR_W = 28
+        BAR_H = 7
+        COLOR = (200, 200, 200)
+
+        if slide.get("show_countdown"):
+            kind = "clock"
+        elif slide.get("show_progress_bar"):
+            kind = "bar"
+        else:
+            return
+
+        label_h = 30
+        label_cy = y + th + label_h // 2
+        centered = slide.get("show_page_number")
+
+        if kind == "clock":
+            cx = x + tw // 2 if centered else x + tw - MARGIN - CLOCK_R
+            cy = label_cy
+            pygame.draw.circle(self.screen, COLOR, (cx, cy), CLOCK_R, 2)
+            for angle_deg, length in [(-60, 0.52), (0, 0.78)]:
+                rad = math.radians(angle_deg)
+                ex = cx + int(CLOCK_R * length * math.sin(rad))
+                ey = cy - int(CLOCK_R * length * math.cos(rad))
+                pygame.draw.line(self.screen, COLOR, (cx, cy), (ex, ey), 2)
+
+        else:  # bar
+            bx = x + tw // 2 - BAR_W // 2 if centered else x + tw - MARGIN - BAR_W
+            by = label_cy - BAR_H // 2
+            pygame.draw.rect(self.screen, COLOR, (bx, by, BAR_W, BAR_H), 1, border_radius=2)
+            fill_w = max(1, BAR_W * 2 // 5 - 2)
+            pygame.draw.rect(self.screen, COLOR, (bx + 1, by + 1, fill_w, BAR_H - 2), border_radius=1)
 
     def _draw_help_overlay(self):
         overlay = pygame.Surface((self.screen_w, self.screen_h), pygame.SRCALPHA)

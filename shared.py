@@ -137,6 +137,9 @@ def load_config(config_file="config.toml"):
         if "duration" in slide and "until" in slide:
             raise RuntimeError(f"{label}: 'duration' and 'until' are mutually exclusive")
 
+        if slide.get("show_countdown") and slide.get("show_progress_bar"):
+            raise RuntimeError(f"{label}: 'show_countdown' and 'show_progress_bar' are mutually exclusive")
+
         if "duration" in slide and slide["duration"] < 0:
             raise RuntimeError(f"{label}: 'duration' must be non-negative, got {slide['duration']!r}")
 
