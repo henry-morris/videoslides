@@ -3,8 +3,8 @@
 # /// script
 # requires_python = "==3.11.*"
 # dependencies = [
-#   "pygame",
-#   "PyMuPDF",
+#   "pygame==2.6.1",
+#   "PyMuPDF==1.27.1",
 # ]
 # ///
 

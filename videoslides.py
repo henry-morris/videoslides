@@ -3,8 +3,8 @@
 # /// script
 # requires_python = "==3.11.*"
 # dependencies = [
-#   "moviepy",
-#   "PyMuPDF",
+#   "moviepy==2.2.1",
+#   "PyMuPDF==1.27.1",
 # ]
 # ///
 
