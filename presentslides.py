@@ -14,6 +14,7 @@ import argparse
 import datetime
 import math
 import os
+from enum import IntEnum
 from pathlib import Path
 
 import pygame
@@ -23,6 +24,12 @@ from shared import (
     load_config,
     resolve_slides,
 )
+
+
+class Dirty(IntEnum):
+    NONE = 0
+    OVERLAY = 1  # only bottom overlay strip changed
+    FULL = 2     # slide or mode changed; full redraw needed
 
 
 # Layout constants
@@ -141,20 +148,18 @@ class Presenter:
         self.slide_surfaces = []
         self.thumb_surfaces = []
         self._scale_cache = {}
-
-        # Mouse repeat state
-        self._mouse_held = None  # None, "next", or "prev"
-        self._mouse_hold_time = 0.0
-        self._mouse_repeat_delay = 0.4  # seconds before repeat starts
-        self._mouse_repeat_interval = 0.1  # seconds between repeats
-        self._mouse_next_repeat = 0.0
+        self._slide_bg = None  # cached screen after slide base, before overlays
+        self._dirty = Dirty.FULL  # initial full draw needed
 
     # ------------------------------------------------------------------
     # Initialization
     # ------------------------------------------------------------------
 
     def init_pygame(self):
-        pygame.init()
+        # Selective init avoids the joystick subsystem (which caps SDL_WaitEvent
+        # to 3s for hotplug polling) and the ALSA audio thread (~5% CPU at idle).
+        pygame.display.init()
+        pygame.font.init()
         pygame.display.set_caption("VideoSlides Presenter")
 
         # Capture native desktop resolution before creating any window
@@ -178,6 +183,9 @@ class Presenter:
         self.big_font = pygame.font.SysFont("sans", FONT_SIZE_BIG)
         self.countdown_font = pygame.font.SysFont("sans", FONT_SIZE_COUNTDOWN)
         self.section_font = pygame.font.SysFont("sans", FONT_SIZE_SECTION)
+        # Precomputed bar heights for dirty rect calculations
+        self._info_bar_h = self.font.get_height() + 16
+        self._countdown_bar_h = self.countdown_font.get_height() + 16
 
         self._load_images()
         pygame.mouse.set_visible(False)
@@ -283,6 +291,7 @@ class Presenter:
     def toggle_fullscreen(self):
         self.fullscreen = not self.fullscreen
         self._scale_cache = {}
+        self._slide_bg = None
         if self.fullscreen:
             # Remember current windowed size before going fullscreen
             self.windowed_size = (self.screen_w, self.screen_h)
@@ -303,7 +312,10 @@ class Presenter:
     # ------------------------------------------------------------------
 
     def handle_events(self):
-        for event in pygame.event.get():
+        events = pygame.event.get()
+        if events:
+            self._dirty = max(self._dirty, Dirty.FULL)
+        for event in events:
             if event.type == pygame.QUIT:
                 self.running = False
                 return
@@ -314,6 +326,7 @@ class Presenter:
                     (event.w, event.h), pygame.RESIZABLE
                 )
                 self._scale_cache = {}
+                self._slide_bg = None
 
             elif event.type == pygame.KEYDOWN:
                 self._on_key(event)
@@ -322,8 +335,6 @@ class Presenter:
                 self._on_click(event)
 
             elif event.type == pygame.MOUSEBUTTONUP:
-                if event.button in (1, 3):
-                    self._mouse_held = None
                 if self.mode == self.MODE_OVERVIEW and event.button == 1:
                     self._on_overview_mouseup(event)
 
@@ -700,14 +711,8 @@ class Presenter:
         else:
             if event.button == 1:
                 self.next_slide()
-                self._mouse_held = "next"
-                self._mouse_hold_time = 0.0
-                self._mouse_next_repeat = self._mouse_repeat_delay
             elif event.button == 3:
                 self.prev_slide()
-                self._mouse_held = "prev"
-                self._mouse_hold_time = 0.0
-                self._mouse_next_repeat = self._mouse_repeat_delay
 
     def _click_overview(self, event):
         if event.button == 1:
@@ -782,16 +787,6 @@ class Presenter:
             else:
                 pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
 
-        # Mouse hold-to-repeat
-        if self._mouse_held and self.mode == self.MODE_PRESENT:
-            self._mouse_hold_time += dt
-            if self._mouse_hold_time >= self._mouse_next_repeat:
-                if self._mouse_held == "next":
-                    self.next_slide()
-                elif self._mouse_held == "prev":
-                    self.prev_slide()
-                self._mouse_next_repeat += self._mouse_repeat_interval
-
         if self.mode != self.MODE_PRESENT:
             return
         if self.paused or self.blank:
@@ -816,6 +811,9 @@ class Presenter:
                     if not self.paused:
                         self.paused = True
                         self.auto_paused = True
+                self._dirty = max(self._dirty, Dirty.FULL)
+            else:
+                self._dirty = max(self._dirty, Dirty.OVERLAY)  # countdown ticking
             return
 
         duration = slide["duration"]
@@ -825,6 +823,7 @@ class Presenter:
             if not self.paused:
                 self.paused = True
                 self.auto_paused = True
+                self._dirty = max(self._dirty, Dirty.FULL)
             return
 
         self.slide_time += dt
@@ -837,14 +836,44 @@ class Presenter:
             else:
                 self.slide_time = duration
                 self.paused = True
+            self._dirty = max(self._dirty, Dirty.FULL)
+            return
+
+        # Progress bar or countdown animation running
+        if slide.get("show_progress_bar") or slide.get("show_countdown"):
+            self._dirty = max(self._dirty, Dirty.OVERLAY)
+            return
+
+        # Info bar shows elapsed/remaining time updated each second
+        if self.show_info:
+            self._dirty = max(self._dirty, Dirty.OVERLAY)
 
     # ------------------------------------------------------------------
     # Drawing
     # ------------------------------------------------------------------
 
     def draw(self):
+        level, self._dirty = self._dirty, Dirty.NONE
+        if level == Dirty.NONE:
+            return
+
+        if level == Dirty.OVERLAY and self.mode == self.MODE_PRESENT:
+            if self._slide_bg is not None and self._slide_bg.get_size() == (self.screen_w, self.screen_h):
+                rect = self._overlay_strip_rect()
+                self.screen.blit(self._slide_bg, (0, rect.top), rect)
+                self._draw_presentation_overlays()
+                pygame.display.update(rect)
+                return
+            # slide_bg not ready; fall through to full draw
+
         if self.mode == self.MODE_PRESENT:
-            self._draw_presentation()
+            self._draw_slide_base()
+            # Cache base (no overlays) so overlay-only redraws can restore it
+            if self._slide_bg is None or self._slide_bg.get_size() != (self.screen_w, self.screen_h):
+                self._slide_bg = self.screen.copy()
+            else:
+                self._slide_bg.blit(self.screen, (0, 0))
+            self._draw_presentation_overlays()
         elif self.mode == self.MODE_OVERVIEW:
             self._draw_overview()
         elif self.mode == self.MODE_HELP:
@@ -853,34 +882,31 @@ class Presenter:
         elif self.mode == self.MODE_GOTO:
             self._draw_presentation()
             self._draw_goto_overlay()
+        pygame.display.flip()
 
-    def _draw_presentation(self):
+    def _draw_slide_base(self):
         self.screen.fill((0, 0, 0))
-
         if self.blank == "black":
-            self._draw_info()
             return
         if self.blank == "white":
             self.screen.fill((255, 255, 255))
-            self._draw_info()
             return
-
-        # Slide image
         surf = self._scaled_surface(self.current)
         x = (self.screen_w - surf.get_width()) // 2
         y = (self.screen_h - surf.get_height()) // 2
         self.screen.blit(surf, (x, y))
 
+    def _draw_presentation_overlays(self):
         slide = self.slides[self.current]
-
-        # Progress bar or countdown (mutually exclusive; countdown wins)
         if slide["show_countdown"]:
             self._draw_countdown()
         elif slide["show_progress_bar"]:
             self._draw_progress_bar()
-
-        # Info overlay
         self._draw_info()
+
+    def _draw_presentation(self):
+        self._draw_slide_base()
+        self._draw_presentation_overlays()
 
     def _slide_remaining(self, slide):
         """Seconds remaining on the current slide (wall clock or duration-based)."""
@@ -1009,6 +1035,13 @@ class Presenter:
             self.font, right_str, (200, 200, 200),
             (self.screen_w - rw - 16, text_y),
         )
+
+    def _overlay_strip_rect(self):
+        """Rect covering all possible overlay content (progress bar + info/countdown bar)."""
+        _, progress_h = self._bar_style(self.slides[self.current])
+        bar_h = max(self._info_bar_h, self._countdown_bar_h)
+        strip_top = min(self.screen_h - bar_h, self.screen_h - progress_h - 20)
+        return pygame.Rect(0, strip_top, self.screen_w, self.screen_h - strip_top)
 
     def _draw_overview(self):
         self.screen.fill((30, 30, 30))
@@ -1277,7 +1310,6 @@ class Presenter:
             self.handle_events()
             self.update(dt)
             self.draw()
-            pygame.display.flip()
 
         pygame.quit()
 
