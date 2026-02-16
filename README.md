@@ -1,9 +1,10 @@
 # VideoSlides
 
-Two tools for working with PDF presentations, sharing the same TOML config and cached slide images.
+Three tools for working with PDF presentations, sharing the same TOML config and cached slide images.
 
 - **videoslides** -- render a presentation to an MP4/MKV video file
 - **presentslides** -- run an interactive full-screen presentation with auto-advance, keyboard navigation, and a slide overview
+- **webslides** -- export a presentation as a self-contained static web site (HTML + PNGs)
 
 ## Installation
 
@@ -38,6 +39,12 @@ Both accept the same arguments:
 ```bash
 uv run videoslides /path/to/slides --config myconfig.toml
 uv run presentslides /path/to/slides --config myconfig.toml
+```
+
+Export to web:
+
+```bash
+uv run webslides /path/to/output [/path/to/slides] --config myconfig.toml
 ```
 
 ## Configuration
@@ -179,6 +186,61 @@ uv run presentslides --config myconfig.toml
 
 Mouse: left-click = next, right-click = previous.
 
+## webslides
+
+Exports the presentation as a static web site you can open in any browser or host on a web server.
+
+```bash
+uv run webslides /path/to/output
+uv run webslides /path/to/output /path/to/slides
+uv run webslides /path/to/output --config myconfig.toml
+```
+
+The output directory will contain:
+
+```
+output/
+  index.html     # self-contained presenter (no external dependencies)
+  slides/
+    0000.png
+    0001.png
+    ...
+```
+
+Open `index.html` directly in a browser (`file://` works) or serve the directory over HTTP.
+
+### Features
+
+- Auto-advances slides based on configured durations
+- Per-slide progress bar and countdown (when enabled)
+- Info bar with slide counter, presentation timer, title, and page number
+- Slide overview with thumbnails (press **Tab** or **O**)
+- Preloads all images on page load with a progress indicator
+- Fullscreen mode via the browser Fullscreen API
+
+### Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| Right / Enter | Next slide |
+| Left / Backspace | Previous slide |
+| Home / End | First / last slide |
+| Space / P | Pause / play |
+| T | Toggle info bar |
+| G | Go to slide by number |
+| Tab / O | Slide overview |
+| F / F11 | Toggle fullscreen |
+| H / F1 / ? | Help overlay |
+| Q / Escape | Close tab |
+
+Mouse: left-click = next, right-click = previous.
+
+### Differences from presentslides
+
+- No black/white screen blanking (B/W keys)
+- No windowed/fullscreen toggle beyond the browser's own Fullscreen API
+- `Q / Escape` calls `window.close()`, which only works in tabs opened by script
+
 ## Shared Cache
 
 Both tools use the same PNG cache (`~/.cache/videoslides/` by default). PDFs are hashed by content, so the same PDF is only rendered once regardless of which tool you use or how many projects reference it.
@@ -188,6 +250,7 @@ Both tools use the same PNG cache (`~/.cache/videoslides/` by default). PDFs are
 - **PyMuPDF** -- PDF rendering
 - **moviepy** -- video encoding (videoslides)
 - **pygame** -- interactive display (presentslides)
+- No extra dependencies for webslides (outputs plain HTML + PNG)
 
 ## License
 
