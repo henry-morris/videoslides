@@ -2,3 +2,7 @@
 /.idea
 .autoenv*
 .gitignore
+uv.lock
+.DS_Store
+/__pycache__
+config.toml
