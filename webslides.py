@@ -187,27 +187,21 @@ body {
   cursor: default;
 }
 .section-heading {
-  height: 75px;
   display: flex;
-  align-items: flex-start;
+  align-items: baseline;
   padding-top: 1.15vw;
+  padding-bottom: 0.4vw;
   gap: 12px;
 }
 .section-title {
-  font-size: 1.6vw;
+  font-size: 2.0vw;
   color: #8c8c8c;
   line-height: 1;
 }
 .section-duration {
-  font-size: 1.1vw;
+  font-size: 1.3vw;
   color: #646464;
   line-height: 1;
-  padding-bottom: 2px;
-}
-.section-rule {
-  border: none;
-  border-top: 1px solid #3c3c3c;
-  margin: 0 0 4px 0;
 }
 .thumb-grid {
   display: grid;
@@ -232,7 +226,7 @@ body {
 .thumb-img-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .thumb-label {
   display: flex;
-  font-size: 0.85vw;
+  font-size: 1.3vw;
   color: #b4b4b4;
   padding: 3px 2px 0;
   height: 22px;
@@ -742,10 +736,6 @@ function renderOverview() {
     }
 
     overviewView.appendChild(heading);
-
-    const rule = document.createElement('hr');
-    rule.className = 'section-rule';
-    overviewView.appendChild(rule);
 
     // Grid
     const grid = document.createElement('div');
