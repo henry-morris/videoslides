@@ -133,6 +133,12 @@ Each `[[slides]]` entry supports:
 - `"1,3,5"` -- specific pages
 - `"1-3,7,10-12"` -- mixed
 
+Append `!` to assert the range covers every page in the PDF. A large warning is printed if any pages are unused — useful for catching when a speaker adds a slide and the config isn't updated:
+
+```toml
+pages = "1-20!"   # warns if PDF has more than 20 pages
+```
+
 ## videoslides
 
 Renders the presentation to an MP4 or MKV video file.

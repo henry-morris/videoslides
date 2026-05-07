@@ -56,6 +56,7 @@ def get_cached_page_count(pdf_cache_dir):
 
 def parse_page_range(pages_str, total_pages):
     """Parse page range string into list of page numbers."""
+    pages_str = pages_str.rstrip("!")
     if pages_str.lower() == "all":
         return list(range(1, total_pages + 1))
 
@@ -71,11 +72,24 @@ def parse_page_range(pages_str, total_pages):
     return sorted(set(pages))
 
 
+def _warn_unused_pages(filename, pages_spec, covered, total, unused):
+    B = "\033[1m"
+    R = "\033[0m"
+    T = "⚠️ "
+    print(f"\n{T*20}")
+    print(f"{T}  {B}WARNING{R}")
+    print(f"{T}  '{filename}': pages \"{pages_spec}\" covers {covered} of {total}")
+    print(f"{T}  {unused} page(s) unused")
+    print(f"{T*20}\n")
+
+
 def resolve_slides(config):
     """Yield (slide_cfg, pdf_cache_dir, total_pages, page_numbers) for each cached slide."""
     for slide_cfg in config["slides"]:
         filename = slide_cfg["filename"]
         pages_spec = slide_cfg.get("pages", "all")
+
+        exact = pages_spec.endswith("!")
 
         pdf_file = Path(filename)
         if not pdf_file.exists():
@@ -89,6 +103,11 @@ def resolve_slides(config):
             continue
 
         page_numbers = parse_page_range(pages_spec, total_pages)
+
+        if exact and len(page_numbers) != total_pages:
+            unused = total_pages - len(page_numbers)
+            _warn_unused_pages(filename, pages_spec.rstrip("!"), len(page_numbers), total_pages, unused)
+
         yield slide_cfg, pdf_cache_dir, total_pages, page_numbers
 
 
