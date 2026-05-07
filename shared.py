@@ -112,7 +112,7 @@ def load_config(config_file="config.toml"):
         "keyframe_interval", "background_color",
     }
     KNOWN_SLIDE_KEYS = {
-        "filename", "duration", "until", "pages", "title",
+        "filename", "duration", "until", "pages", "title", "slug",
         "show_page_number", "show_progress_bar", "show_countdown",
         "progress_bar_color", "progress_bar_height",
     }

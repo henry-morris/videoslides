@@ -26,6 +26,7 @@ def build_slide_list(config):
     """Build an ordered list of slide metadata from config, referencing cached PNGs."""
     slides = []
     prev_title = None
+    prev_slug = None
     for slide_cfg, pdf_cache_dir, total_pages, page_numbers in resolve_slides(config):
         until = slide_cfg.get("until", None)
         duration = slide_cfg.get("duration", None)
@@ -38,6 +39,9 @@ def build_slide_list(config):
         bar_height = slide_cfg.get("progress_bar_height", None)
         title = slide_cfg.get("title", prev_title)
         prev_title = title
+        if "slug" in slide_cfg:
+            prev_slug = slide_cfg["slug"] or None  # "" resets to no slug
+        slug = prev_slug
         show_page_number = slide_cfg.get("show_page_number", False)
         show_countdown = slide_cfg.get("show_countdown", False)
 
@@ -51,6 +55,7 @@ def build_slide_list(config):
                     "bar_color": bar_color,
                     "bar_height": bar_height,
                     "title": title,
+                    "slug": slug,
                     "show_page_number": show_page_number,
                     "show_countdown": show_countdown,
                     "until": until,
@@ -1134,6 +1139,33 @@ def export(config, output_dir: Path):
     print(f"Exported {len(slide_data)} slides to {output_dir.resolve()}")
     print(f"Open: {index_path.resolve()}")
 
+    # Per-slug sub-presentations sharing the same slides/ images
+    slugs_seen = {}
+    for raw, data in zip(slides_raw, slide_data):
+        slug = raw.get("slug")
+        if slug is None:
+            continue
+        if slug not in slugs_seen:
+            slugs_seen[slug] = []
+        slugs_seen[slug].append((raw, data))
+
+    manifest_slugs = []
+    for slug, pairs in slugs_seen.items():
+        raw_subset = [p[0] for p in pairs]
+        data_subset = [dict(p[1], src="../" + p[1]["src"]) for p in pairs]
+        sub_sections = build_sections(raw_subset)
+        sub_html = HTML_TEMPLATE.replace("__SLIDES_DATA__", json.dumps(data_subset, indent=2))
+        sub_html = sub_html.replace("__SECTIONS_DATA__", json.dumps(sub_sections, indent=2))
+        slug_dir = output_dir / slug
+        slug_dir.mkdir(parents=True, exist_ok=True)
+        (slug_dir / "index.html").write_text(sub_html, encoding="utf-8")
+        print(f"  /{slug}/ — {len(data_subset)} slides")
+        title = next((r["title"] for r in raw_subset if r.get("title")), slug)
+        manifest_slugs.append({"slug": slug, "title": title})
+
+    manifest = {"slugs": manifest_slugs}
+    (output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -1154,7 +1186,7 @@ def main():
     )
 
     args = parser.parse_args()
-    output_dir = Path(args.output)
+    output_dir = Path(args.output).resolve()
 
     original_dir = os.getcwd()
     os.chdir(args.directory)

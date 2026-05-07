@@ -118,6 +118,7 @@ Each `[[slides]]` entry supports:
 | `until` | *(none)* | Wall clock deadline in `"HH:MM"` 24-hour format; slide counts down to this time and auto-advances when reached. Mutually exclusive with `duration`. (presentslides) |
 | `pages` | `all` | Page selection (see below) |
 | `title` | *(inherited)* | Short label shown on the presenter info bar. Carries forward to subsequent sections until changed. |
+| `slug` | *(inherited)* | URL slug for webslides sub-presentations. Slides with the same slug are grouped into `output/<slug>/index.html`, sharing the parent `slides/` images. Carries forward; set `slug = ""` to clear. |
 | `show_page_number` | `false` | Show PDF page number on the presenter info bar |
 | `show_progress_bar` | `false` | Animated progress bar at the bottom of the slide |
 | `progress_bar_color` | white (presenter) / `#1f4305` (video) | Bar color, hex or named |
