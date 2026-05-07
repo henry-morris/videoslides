@@ -87,9 +87,9 @@ def resolve_slides(config):
     """Yield (slide_cfg, pdf_cache_dir, total_pages, page_numbers) for each cached slide."""
     for slide_cfg in config["slides"]:
         filename = slide_cfg["filename"]
-        pages_spec = slide_cfg.get("pages", "all")
-
-        exact = pages_spec.endswith("!")
+        is_image = Path(filename).suffix.lower() == ".png"
+        pages_spec = "all" if is_image else slide_cfg.get("pages", "all")
+        exact = (not is_image) and pages_spec.endswith("!")
 
         pdf_file = Path(filename)
         if not pdf_file.exists():
@@ -153,6 +153,9 @@ def load_config(config_file="config.toml"):
             if key not in KNOWN_SLIDE_KEYS:
                 raise RuntimeError(f"{label}: unknown option '{key}'")
 
+        if Path(slide.get("filename", "")).suffix.lower() == ".png" and "pages" in slide:
+            raise RuntimeError(f"{label}: 'pages' is not valid for PNG images")
+
         if "duration" in slide and "until" in slide:
             raise RuntimeError(f"{label}: 'duration' and 'until' are mutually exclusive")
 
@@ -187,13 +190,16 @@ def pdfs_to_pngs(config, target_width=1920, target_height=1080):
         filename = slide["filename"]
         duration = slide.get("duration", 15) or 15
         pages_spec = slide.get("pages", "all")
+        is_image = Path(filename).suffix.lower() == ".png"
 
         pdf_file = Path(filename)
         if not pdf_file.exists():
             print(f"⚠️ Skipping '{filename}' - file not found")
             continue
 
-        print(f"\n📄 Processing '{filename}' (order={order}, duration={duration}s, pages={pages_spec})...")
+        kind = "image" if is_image else "PDF"
+        pages_info = "" if is_image else f", pages={pages_spec}"
+        print(f"\n📄 Processing '{filename}' ({kind}, order={order}, duration={duration}s{pages_info})...")
 
         # Calculate PDF hash for caching
         pdf_hash = calculate_pdf_hash(pdf_file)

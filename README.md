@@ -113,7 +113,7 @@ Each `[[slides]]` entry supports:
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `filename` | *(required)* | PDF file path |
+| `filename` | *(required)* | PDF or PNG file path. PNG files are treated as a single slide; `pages` is not valid for them. |
 | `duration` | *(none)* | Seconds per page. Mutually exclusive with `until`. Omit both for a pause-only slide (presentslides pauses on arrival; unpause to advance). Default `15` for videoslides. |
 | `until` | *(none)* | Wall clock deadline in `"HH:MM"` 24-hour format; slide counts down to this time and auto-advances when reached. Mutually exclusive with `duration`. (presentslides) |
 | `pages` | `all` | Page selection (see below) |
