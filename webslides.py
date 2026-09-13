@@ -1070,8 +1070,16 @@ helpOverlay.addEventListener('click', () => enterPresentMode());
     countEl.textContent = loaded + ' / ' + total;
     if (loaded === total) {
       overlay.style.display = 'none';
-      enterPresentMode();
-      gotoSlide(0);
+      // #overview opens on the contact sheet instead of starting the show:
+      // what a link to a whole evening wants, where a link to one deck wants
+      // to present. Escape or Tab drops into presenting from there as usual.
+      if (location.hash === '#overview') {
+        gotoSlide(0);
+        enterOverviewMode();
+      } else {
+        enterPresentMode();
+        gotoSlide(0);
+      }
     }
   }
 
