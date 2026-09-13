@@ -17,13 +17,57 @@ def parse_color(color_str):
     return (0, 0, 0)
 
 
+_HASH_CACHE = {}
+_HASH_CHUNK = 1 << 20
+
+
 def calculate_pdf_hash(pdf_path):
-    """Calculate SHA-256 hash of a PDF file."""
+    """SHA-256 of a PDF, memoised for the life of the process.
+
+    A build hashes every slide entry's PDF three times - twice while converting
+    and once from resolve_slides - so a top-and-tail deck referenced two dozen
+    times was read from disk seventy times over. Keying on size and mtime still
+    notices a file that changes mid-run.
+    """
+    path = Path(pdf_path)
+    info = path.stat()
+    key = (str(path.resolve()), info.st_size, info.st_mtime_ns)
+    if key in _HASH_CACHE:
+        return _HASH_CACHE[key]
+
     sha256_hash = hashlib.sha256()
-    with open(pdf_path, "rb") as f:
-        for chunk in iter(lambda: f.read(4096), b""):
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(_HASH_CHUNK), b""):
             sha256_hash.update(chunk)
-    return sha256_hash.hexdigest()
+    _HASH_CACHE[key] = sha256_hash.hexdigest()
+    return _HASH_CACHE[key]
+
+
+def letterbox(pix, target_width, target_height, bg_rgb):
+    """Centre a rendered page on a target-sized background.
+
+    Returns the page untouched when it already fills the frame. That is the
+    normal case - any 16:9 source scales to exactly the target - and copying it
+    into an identically sized buffer costs a second a page for no change.
+
+    When a copy is genuinely needed, rows are assembled in a bytearray rather
+    than written into the destination Pixmap. Both do the same memcpy, but
+    writing through PyMuPDF's memoryview costs milliseconds per row: about 350x
+    the whole bytearray version for one page.
+    """
+    if pix.width == target_width and pix.height == target_height:
+        return pix
+
+    left = (target_width - pix.width) // 2
+    top = (target_height - pix.height) // 2
+    row_bytes = pix.width * 3
+    buf = bytearray(bytes(bg_rgb) * (target_width * target_height))
+    src = pix.samples_mv
+    for y in range(pix.height):
+        start = y * pix.stride
+        dest = ((top + y) * target_width + left) * 3
+        buf[dest:dest + row_bytes] = src[start:start + row_bytes]
+    return fitz.Pixmap(fitz.csRGB, target_width, target_height, bytes(buf), 0)
 
 
 def get_cache_root(config):
@@ -231,24 +275,11 @@ def pdfs_to_pngs(config, target_width=1920, target_height=1080):
                 # Scale to fit within target while preserving aspect ratio
                 zoom = min(target_width / page.rect.width, target_height / page.rect.height)
                 mat = fitz.Matrix(zoom, zoom)
-                pix = page.get_pixmap(matrix=mat)
-
-                # Letterbox: create target-sized pixmap with background color
-                bg = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, target_width, target_height), 0)
-                bg.set_rect(bg.irect, bg_rgb)
-
-                # Copy rendered page into center
-                left = (target_width - pix.width) // 2
-                top = (target_height - pix.height) // 2
-                src = pix.samples_mv
-                dst = bg.samples_mv
-                for y in range(pix.height):
-                    s = y * pix.stride
-                    d = (top + y) * bg.stride + left * 3
-                    dst[d:d + pix.width * 3] = src[s:s + pix.width * 3]
+                pix = letterbox(page.get_pixmap(matrix=mat),
+                                target_width, target_height, bg_rgb)
 
                 temp_png = pdf_temp_dir / f"{page_idx + 1:03d}.png"
-                bg.save(str(temp_png))
+                pix.save(str(temp_png))
 
             doc.close()
 
