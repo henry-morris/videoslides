@@ -24,7 +24,16 @@ uv pip install -e .
 
 ## Quick Start
 
-Both tools read a `config.toml` that lists PDF files, page ranges, and durations:
+Both tools read a `config.toml` that lists PDF files, page ranges, and durations.
+The `example/` directory has a small placeholder deck and a config that uses every
+option, so you can try each tool straight away:
+
+```bash
+uv run presentslides example
+uv run webslides /tmp/webslides-out example
+```
+
+In your own slides directory:
 
 ```bash
 # Render to video
@@ -193,6 +202,8 @@ uv run presentslides --config myconfig.toml
 
 Mouse: left-click = next, right-click = previous.
 
+On the slide overview: arrows move the selection, Home / End jump to the first / last slide, Enter shows the selected slide, and G, H / ? and F work as above (help and go-to return you to the overview when dismissed).
+
 ## webslides
 
 Exports the presentation as a static web site you can open in any browser or host on a web server.
@@ -238,15 +249,17 @@ Open `index.html` directly in a browser (`file://` works) or serve the directory
 | Tab / O | Slide overview |
 | F / F11 | Toggle fullscreen |
 | H / F1 / ? | Help overlay |
-| Q / Escape | Close tab |
+| Q / Escape | Leave fullscreen |
 
 Mouse: left-click = next, right-click = previous.
+
+On the slide overview: arrows move the selection, Home / End jump to the first / last slide, Enter shows the selected slide, and G, H / ? and F work as above (help and go-to return you to the overview when dismissed).
 
 ### Differences from presentslides
 
 - No black/white screen blanking (B/W keys)
 - No windowed/fullscreen toggle beyond the browser's own Fullscreen API
-- `Q / Escape` calls `window.close()`, which only works in tabs opened by script
+- A browser tab can't quit itself, so `Q / Escape` just leaves fullscreen
 
 ## Shared Cache
 

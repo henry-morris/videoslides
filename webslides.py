@@ -98,6 +98,11 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Presentation</title>
 <style>
+/* Sizes mirror presentslides.py, which lays out in pixels on a 1920-wide
+   screen. --px is one of those pixels, so the two look identical at 1920 and
+   the web version scales proportionally in smaller windows. */
+:root { --px: calc(100vw / 1920); }
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
@@ -123,16 +128,17 @@ body {
   display: block;
 }
 
-/* Info bar */
+/* Info bar: FONT_SIZE_INFO 24, bar = text + 16, text inset 16 */
 #info-bar {
   position: absolute;
   bottom: 0; left: 0; right: 0;
   background: rgba(0,0,0,0.55);
-  padding: 8px 16px;
+  padding: calc(8 * var(--px)) calc(16 * var(--px));
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 1.4vw;
+  font-size: calc(24 * var(--px));
+  line-height: 1.17;
   color: #fff;
   text-shadow: 1px 1px 0 #000;
   pointer-events: none;
@@ -143,105 +149,115 @@ body {
 
 #info-left, #info-center, #info-right {
   flex: 1;
-  white-space: nowrap;
+  white-space: pre;   /* keep the three-space separators between parts */
 }
 #info-left { text-align: left; }
 #info-center { text-align: center; }
-#info-right  { text-align: right; }
+#info-right  { text-align: right; color: #c8c8c8; }
 
 .status-paused  { color: #ffc800; }
 .status-waiting { color: #64c8ff; }
 .status-running { color: #50dc64; }
 
-/* Progress bar */
+/* Progress bar: sits 20px above the bottom edge */
 #progress-bar-wrap {
   position: absolute;
-  bottom: 20px; left: 0; right: 0;
+  bottom: calc(20 * var(--px)); left: 0; right: 0;
   pointer-events: none;
   display: none;
 }
 #progress-bar-fill {
-  height: 16px;
+  height: calc(16 * var(--px));
   background: rgb(31,67,5);
   width: 0%;
 }
 
-/* Countdown */
+/* Countdown: FONT_SIZE_COUNTDOWN 36, bar = text + 16 */
 #countdown-bar {
   position: absolute;
   bottom: 0; left: 0; right: 0;
   background: rgba(0,0,0,0.55);
-  padding: 6px 0;
+  padding: calc(8 * var(--px)) 0;
   text-align: center;
-  font-size: 1.9vw;
-  font-weight: bold;
+  font-size: calc(36 * var(--px));
+  line-height: 1.17;
   color: #fff;
   text-shadow: 1px 1px 0 #000;
   pointer-events: none;
   display: none;
 }
 
-/* ── Overview mode ── */
+/* ── Overview mode ──
+   OVERVIEW_PADDING 20, OVERVIEW_HEADING_H 75 (title drawn 22 down),
+   cell = thumb + 30px label strip + 20 gap. */
 #overview-view {
   position: absolute;
   inset: 0;
   background: #1e1e1e;
   overflow-y: scroll;
-  padding: 20px;
+  padding: calc(20 * var(--px));
   display: none;
   cursor: default;
 }
 .section-heading {
   display: flex;
   align-items: baseline;
-  padding-top: 1.15vw;
-  padding-bottom: 0.4vw;
-  gap: 12px;
+  gap: calc(16 * var(--px));
+  height: calc(75 * var(--px));
+  padding-top: calc(22 * var(--px));
 }
 .section-title {
-  font-size: 2.0vw;
+  font-size: calc(30 * var(--px));
   color: #8c8c8c;
-  line-height: 1;
+  line-height: 1.17;
 }
 .section-duration {
-  font-size: 1.3vw;
+  font-size: calc(20 * var(--px));
   color: #646464;
-  line-height: 1;
+  line-height: 1.17;
 }
 .thumb-grid {
   display: grid;
   grid-template-columns: repeat(8, 1fr);
-  gap: 20px;
-  margin-bottom: 0;
+  column-gap: calc(20 * var(--px));
+  row-gap: calc(20 * var(--px));
+  margin-bottom: calc(20 * var(--px));
 }
 .thumb-cell {
   display: flex;
   flex-direction: column;
   cursor: pointer;
 }
+/* Borders are outlines so they sit outside the thumbnail, as pygame draws
+   them, instead of eating into the image. */
 .thumb-img-wrap {
   position: relative;
   aspect-ratio: 16/9;
   overflow: hidden;
-  border: 1px solid #464646;
+  outline: 1px solid #464646;
 }
-.thumb-cell:hover .thumb-img-wrap { border-color: #787878; }
-.thumb-cell.selected .thumb-img-wrap  { border: 4px solid #0078ff; }
-.thumb-cell.current .thumb-img-wrap   { border: 3px solid #ffb400; }
+.thumb-cell:hover .thumb-img-wrap     { outline: 2px solid #787878; }
+.thumb-cell.current .thumb-img-wrap   { outline: 3px solid #ffb400; }
+.thumb-cell.selected .thumb-img-wrap  { outline: 4px solid #0078ff; }
 .thumb-img-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .thumb-label {
   display: flex;
-  font-size: 1.3vw;
-  color: #b4b4b4;
-  padding: 3px 2px 0;
-  height: 22px;
   align-items: center;
+  height: calc(30 * var(--px));
+  padding: 0 calc(4 * var(--px));
+  font-size: calc(20 * var(--px));
+  line-height: 1.17;
+  color: #b4b4b4;
 }
 .label-left  { flex: 1; }
 .label-mid   { flex: 1; display: flex; justify-content: center; align-items: center; }
 .label-right { flex: 1; display: flex; justify-content: flex-end; align-items: center; }
+.icon-clock { width: calc(20 * var(--px)); height: calc(20 * var(--px)); }
+.icon-bar   { width: calc(28 * var(--px)); height: calc(7 * var(--px)); }
 
-/* ── Help overlay ── */
+/* ── Help overlay ──
+   Two content-sized columns (keys right-aligned, descriptions left) with a
+   24px gap, so headings and rules span exactly the width of the text. */
 #help-overlay {
   position: absolute;
   inset: 0;
@@ -252,30 +268,27 @@ body {
   cursor: default;
 }
 #help-box {
+  display: grid;
+  grid-template-columns: max-content max-content;
+  column-gap: calc(24 * var(--px));
+  font-size: calc(20 * var(--px));
+  line-height: calc(30 * var(--px));
   color: #fff;
-  min-width: 32vw;
 }
 .help-heading {
-  font-size: 1.6vw;
+  grid-column: 1 / -1;
+  font-size: calc(30 * var(--px));
+  line-height: 1.17;
   color: #8c8c8c;
-  margin-bottom: 0.8vw;
   text-align: center;
+  padding-bottom: calc(4 * var(--px));
+  border-bottom: 1px solid #3c3c3c;
+  margin-bottom: calc(5 * var(--px));
 }
-.help-rule {
-  border: none;
-  border-top: 1px solid #3c3c3c;
-  margin: 0 0 6px 0;
-}
-.help-row {
-  display: flex;
-  gap: 1.25vw;
-  padding: 3px 0;
-  font-size: 1.1vw;
-}
-.help-key  { text-align: right; flex: 1; color: #dcdcdc; }
-.help-desc { flex: 2; color: #969696; }
-.help-blank { height: 10px; }
-.help-dim { text-align: center; color: #8c8c8c; font-size: 1.1vw; padding-top: 4px; }
+.help-key  { text-align: right; color: #dcdcdc; }
+.help-desc { color: #969696; }
+.help-blank { grid-column: 1 / -1; height: calc(30 * var(--px)); }
+.help-dim { grid-column: 1 / -1; text-align: center; color: #8c8c8c; }
 
 /* ── Goto overlay ── */
 #goto-overlay {
@@ -290,21 +303,34 @@ body {
   background: #282828;
   border: 2px solid #646464;
   border-radius: 8px;
-  padding: 24px;
-  min-width: 200px;
+  padding: calc(24 * var(--px));
   text-align: left;
 }
 #goto-label {
-  font-size: 1.1vw;
+  font-size: calc(24 * var(--px));
+  line-height: 1.17;
   color: #c8c8c8;
-  margin-bottom: 8px;
+  margin-bottom: calc(10 * var(--px));
 }
 #goto-input-display {
-  font-size: 2.5vw;
+  font-size: calc(48 * var(--px));
+  line-height: 1.17;
   color: #fff;
-  min-height: 40px;
-  letter-spacing: 2px;
+  min-width: 4ch;
+  white-space: pre;
 }
+/* The caret is drawn, not typed: a box-drawing glyph would come from a
+   fallback font on most systems and sit at a different height to the digits. */
+#goto-caret {
+  display: inline-block;
+  width: calc(3 * var(--px));
+  height: 1em;
+  margin-left: calc(4 * var(--px));
+  vertical-align: -0.1em;
+  background: #fff;
+  animation: goto-blink 1s steps(2, start) infinite;
+}
+@keyframes goto-blink { to { visibility: hidden; } }
 
 /* ── Loading overlay ── */
 #loading-overlay {
@@ -323,7 +349,7 @@ body {
   min-width: 260px;
 }
 #loading-text {
-  font-size: 1.4vw;
+  font-size: calc(24 * var(--px));
   color: #c8c8c8;
   margin-bottom: 16px;
 }
@@ -342,7 +368,7 @@ body {
   transition: width 0.1s linear;
 }
 #loading-count {
-  font-size: 1.1vw;
+  font-size: calc(20 * var(--px));
   color: #646464;
 }
 </style>
@@ -370,24 +396,28 @@ body {
 <div id="help-overlay">
   <div id="help-box">
     <div class="help-heading">Playback</div>
-    <hr class="help-rule">
-    <div class="help-row"><span class="help-key">Space / P</span><span class="help-desc">Pause / Play</span></div>
-    <div class="help-row"><span class="help-key">→ / Enter</span><span class="help-desc">Next slide</span></div>
-    <div class="help-row"><span class="help-key">← / Backspace</span><span class="help-desc">Previous slide</span></div>
-    <div class="help-row"><span class="help-key">Home</span><span class="help-desc">First slide</span></div>
-    <div class="help-row"><span class="help-key">End</span><span class="help-desc">Last slide</span></div>
-    <div class="help-row"><span class="help-key">G</span><span class="help-desc">Go to slide number</span></div>
-    <div class="help-row"><span class="help-key">Left click</span><span class="help-desc">Next slide</span></div>
-    <div class="help-row"><span class="help-key">Right click</span><span class="help-desc">Previous slide</span></div>
+    <span class="help-key">Space / P</span><span class="help-desc">Pause / Play</span>
+    <span class="help-key">Right / Enter</span><span class="help-desc">Next slide</span>
+    <span class="help-key">Left / Backspace</span><span class="help-desc">Previous slide</span>
+    <span class="help-key">Home</span><span class="help-desc">First slide</span>
+    <span class="help-key">End</span><span class="help-desc">Last slide</span>
+    <span class="help-key">G</span><span class="help-desc">Go to slide number</span>
+    <span class="help-key">Left click</span><span class="help-desc">Next slide</span>
+    <span class="help-key">Right click</span><span class="help-desc">Previous slide</span>
     <div class="help-blank"></div>
     <div class="help-heading">View</div>
-    <hr class="help-rule">
-    <div class="help-row"><span class="help-key">T</span><span class="help-desc">Toggle info bar</span></div>
-    <div class="help-row"><span class="help-key">Tab / O</span><span class="help-desc">Slide overview</span></div>
-    <div class="help-row"><span class="help-key">F / F11</span><span class="help-desc">Toggle fullscreen</span></div>
-    <div class="help-row"><span class="help-key">H / F1 / ?</span><span class="help-desc">This help</span></div>
+    <span class="help-key">T</span><span class="help-desc">Toggle info bar</span>
+    <span class="help-key">Tab / O</span><span class="help-desc">Slide overview</span>
+    <span class="help-key">F / F11</span><span class="help-desc">Toggle fullscreen</span>
+    <span class="help-key">H / F1 / ?</span><span class="help-desc">This help</span>
     <div class="help-blank"></div>
-    <div class="help-row"><span class="help-key">Q / Escape</span><span class="help-desc">Quit (close tab)</span></div>
+    <div class="help-heading">Overview</div>
+    <span class="help-key">Arrows</span><span class="help-desc">Move selection</span>
+    <span class="help-key">Home / End</span><span class="help-desc">First / last slide</span>
+    <span class="help-key">Enter</span><span class="help-desc">Show selected slide</span>
+    <span class="help-key">Escape / Tab / O</span><span class="help-desc">Back to presentation</span>
+    <div class="help-blank"></div>
+    <span class="help-key">Q / Escape</span><span class="help-desc">Leave fullscreen</span>
     <div class="help-blank"></div>
     <div class="help-dim">Press any key to dismiss</div>
   </div>
@@ -406,7 +436,7 @@ body {
 <div id="goto-overlay">
   <div id="goto-box">
     <div id="goto-label"></div>
-    <div id="goto-input-display"></div>
+    <div id="goto-input-display"><span id="goto-text"></span><span id="goto-caret"></span></div>
   </div>
 </div>
 
@@ -422,7 +452,9 @@ let paused = false;
 let autoPaused = false;
 let showInfo = false;
 let gotoText = '';
+let overlayReturn = 'present'; // mode help/goto go back to: 'present' | 'overview'
 let overviewSelected = 0;
+let overviewPreferredCol = 0; // column to aim for when moving up/down, like a text editor
 let slideStartTime = null;   // performance.now() when slide began
 let slideElapsed = 0;        // seconds already elapsed on this slide before last pause
 let animFrameId = null;
@@ -442,7 +474,7 @@ const progressWrap  = document.getElementById('progress-bar-wrap');
 const progressFill  = document.getElementById('progress-bar-fill');
 const countdownBar  = document.getElementById('countdown-bar');
 const gotoLabel     = document.getElementById('goto-label');
-const gotoDisplay   = document.getElementById('goto-input-display');
+const gotoTextEl   = document.getElementById('goto-text');
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function formatDuration(secs) {
@@ -615,7 +647,7 @@ function updateOverlays() {
   const slide = SLIDES[current];
 
   // Progress bar
-  if (slide.show_progress_bar && !paused) {
+  if (slide.show_progress_bar) {
     progressWrap.style.display = 'block';
     progressFill.style.width = (slideProgress(slide) * 100) + '%';
   } else {
@@ -623,7 +655,7 @@ function updateOverlays() {
   }
 
   // Countdown
-  if (slide.show_countdown && !paused) {
+  if (slide.show_countdown) {
     const rem = slideRemaining(slide);
     if (rem > 0) {
       countdownBar.style.display = 'block';
@@ -685,6 +717,7 @@ function enterOverviewMode() {
   mode = 'overview';
   stopAnimation();
   overviewSelected = current;
+  overviewPreferredCol = findOverviewPos(current).col ?? 0;
   presentView.style.display = 'none';
   overviewView.style.display = 'block';
   helpOverlay.style.display = 'none';
@@ -694,7 +727,19 @@ function enterOverviewMode() {
   overviewScrollToSelected();
 }
 
+// Help and goto sit on top of whichever mode opened them.
+function closeOverlay() {
+  helpOverlay.style.display = 'none';
+  gotoOverlay.style.display = 'none';
+  if (overlayReturn === 'overview') {
+    mode = 'overview';
+  } else {
+    enterPresentMode();
+  }
+}
+
 function enterHelpMode() {
+  overlayReturn = mode;
   mode = 'help';
   stopAnimation();
   helpOverlay.style.display = 'flex';
@@ -702,11 +747,12 @@ function enterHelpMode() {
 }
 
 function enterGotoMode() {
+  overlayReturn = mode;
   mode = 'goto';
   stopAnimation();
   gotoText = '';
   gotoLabel.textContent = `Go to slide (1\u2013${SLIDES.length}):`;
-  gotoDisplay.textContent = '\u2502';
+  gotoTextEl.textContent = '';
   gotoOverlay.style.display = 'flex';
   document.body.style.cursor = 'default';
 }
@@ -745,7 +791,6 @@ function renderOverview() {
     // Grid
     const grid = document.createElement('div');
     grid.className = 'thumb-grid';
-    grid.style.marginBottom = '24px';
 
     for (let i = section.start; i < section.end; i++) {
       const slide = SLIDES[i];
@@ -803,8 +848,7 @@ function renderOverview() {
 
       cell.addEventListener('mousedown', (e) => {
         if (e.button !== 0) return;
-        overviewSelected = i;
-        updateOverviewSelection();
+        selectOverview(i, true);
       });
       cell.addEventListener('click', (e) => {
         if (e.button !== 0) return;
@@ -835,80 +879,60 @@ function overviewScrollToSelected() {
   }
 }
 
-// Overview keyboard: arrow keys navigate within grid, respecting sections
-function overviewMoveRight() {
-  if (overviewSelected < SLIDES.length - 1) {
-    overviewSelected++;
-    updateOverviewSelection();
-    ensureOverviewVisible();
+// Overview keyboard: arrow keys navigate within grid, respecting sections.
+// Left/right (and clicks) set the preferred column; up/down aim for it, so
+// passing through a short row doesn't lose your place, as in a text editor.
+function selectOverview(idx, setPreferredCol) {
+  overviewSelected = idx;
+  if (setPreferredCol) {
+    const { col } = findOverviewPos(idx);
+    if (col !== null) overviewPreferredCol = col;
   }
+  updateOverviewSelection();
+  ensureOverviewVisible();
+}
+function overviewMoveRight() {
+  if (overviewSelected < SLIDES.length - 1) selectOverview(overviewSelected + 1, true);
 }
 function overviewMoveLeft() {
-  if (overviewSelected > 0) {
-    overviewSelected--;
-    updateOverviewSelection();
-    ensureOverviewVisible();
-  }
+  if (overviewSelected > 0) selectOverview(overviewSelected - 1, true);
+}
+// Slide at (row, preferred col) in a section, clamped to the row's end; null if no such row
+function slideAt(secIdx, row) {
+  const sec = SECTIONS[secIdx];
+  const secLen = sec.end - sec.start;
+  const rows = Math.ceil(secLen / OVERVIEW_COLS);
+  if (row < 0 || row >= rows) return null;
+  const pos = Math.min(row * OVERVIEW_COLS + overviewPreferredCol, secLen - 1);
+  return sec.start + pos;
 }
 function overviewMoveDown() {
-  // find section and row of current selection
   const { secIdx, row } = findOverviewPos(overviewSelected);
   if (secIdx === null) return;
-  const section = SECTIONS[secIdx];
-  const secLen = section.end - section.start;
-  const rowsInSection = Math.ceil(secLen / OVERVIEW_COLS);
-  let newIdx = null;
-  if (row + 1 < rowsInSection) {
-    // next row in same section, same column (clamped)
-    const col = (overviewSelected - section.start) % OVERVIEW_COLS;
-    const posInSec = (row + 1) * OVERVIEW_COLS + col;
-    newIdx = section.start + Math.min(posInSec, secLen - 1);
-  } else if (secIdx + 1 < SECTIONS.length) {
-    // first row of next section, same column (clamped)
-    const col = (overviewSelected - section.start) % OVERVIEW_COLS;
-    const nextSec = SECTIONS[secIdx + 1];
-    const nextLen = nextSec.end - nextSec.start;
-    newIdx = nextSec.start + Math.min(col, nextLen - 1);
-  }
-  if (newIdx !== null) {
-    overviewSelected = newIdx;
-    updateOverviewSelection();
-    ensureOverviewVisible();
-  }
+  let newIdx = slideAt(secIdx, row + 1);
+  if (newIdx === null && secIdx + 1 < SECTIONS.length) newIdx = slideAt(secIdx + 1, 0);
+  if (newIdx !== null) selectOverview(newIdx, false);
 }
 function overviewMoveUp() {
   const { secIdx, row } = findOverviewPos(overviewSelected);
   if (secIdx === null) return;
-  const section = SECTIONS[secIdx];
-  let newIdx = null;
-  if (row > 0) {
-    const col = (overviewSelected - section.start) % OVERVIEW_COLS;
-    const posInSec = (row - 1) * OVERVIEW_COLS + col;
-    const secLen = section.end - section.start;
-    newIdx = section.start + Math.min(posInSec, secLen - 1);
-  } else if (secIdx > 0) {
-    const col = (overviewSelected - section.start) % OVERVIEW_COLS;
-    const prevSec = SECTIONS[secIdx - 1];
-    const prevLen = prevSec.end - prevSec.start;
-    const lastRow = Math.floor((prevLen - 1) / OVERVIEW_COLS);
-    const posInSec = lastRow * OVERVIEW_COLS + col;
-    newIdx = prevSec.start + Math.min(posInSec, prevLen - 1);
+  let newIdx = slideAt(secIdx, row - 1);
+  if (newIdx === null && secIdx > 0) {
+    const prevLen = SECTIONS[secIdx - 1].end - SECTIONS[secIdx - 1].start;
+    newIdx = slideAt(secIdx - 1, Math.floor((prevLen - 1) / OVERVIEW_COLS));
   }
-  if (newIdx !== null) {
-    overviewSelected = newIdx;
-    updateOverviewSelection();
-    ensureOverviewVisible();
-  }
+  if (newIdx !== null) selectOverview(newIdx, false);
 }
 
 function findOverviewPos(idx) {
   for (let s = 0; s < SECTIONS.length; s++) {
     const sec = SECTIONS[s];
     if (idx >= sec.start && idx < sec.end) {
-      return { secIdx: s, row: Math.floor((idx - sec.start) / OVERVIEW_COLS) };
+      const pos = idx - sec.start;
+      return { secIdx: s, row: Math.floor(pos / OVERVIEW_COLS), col: pos % OVERVIEW_COLS };
     }
   }
-  return { secIdx: null, row: null };
+  return { secIdx: null, row: null, col: null };
 }
 
 function ensureOverviewVisible() {
@@ -917,45 +941,28 @@ function ensureOverviewVisible() {
 }
 
 // ── SVG icons for thumbnails ───────────────────────────────────────────────
+// Geometry copies presentslides' _draw_thumbnail_overlays: a radius-9 clock
+// with hands at 12 and 3 o'clock, and a 28x7 bar two-fifths full.
+function svgEl(tag, attrs) {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  return el;
+}
+
 function makeClock() {
-  const ns = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(ns, 'svg');
-  svg.setAttribute('width', '20'); svg.setAttribute('height', '20');
-  svg.setAttribute('viewBox', '0 0 20 20');
-  const circle = document.createElementNS(ns, 'circle');
-  circle.setAttribute('cx', '10'); circle.setAttribute('cy', '10'); circle.setAttribute('r', '8');
-  circle.setAttribute('stroke', '#c8c8c8'); circle.setAttribute('stroke-width', '2'); circle.setAttribute('fill', 'none');
-  svg.appendChild(circle);
-  // hour hand (~10:00 position)
-  const h = document.createElementNS(ns, 'line');
-  h.setAttribute('x1', '10'); h.setAttribute('y1', '10');
-  h.setAttribute('x2', '10'); h.setAttribute('y2', '4');
-  h.setAttribute('stroke', '#c8c8c8'); h.setAttribute('stroke-width', '2');
-  svg.appendChild(h);
-  const m = document.createElementNS(ns, 'line');
-  m.setAttribute('x1', '10'); m.setAttribute('y1', '10');
-  m.setAttribute('x2', '16'); m.setAttribute('y2', '10');
-  m.setAttribute('stroke', '#c8c8c8'); m.setAttribute('stroke-width', '2');
-  svg.appendChild(m);
+  const svg = svgEl('svg', { class: 'icon-clock', viewBox: '0 0 20 20' });
+  const stroke = { stroke: '#c8c8c8', 'stroke-width': '2', fill: 'none', 'stroke-linecap': 'round' };
+  svg.appendChild(svgEl('circle', { cx: 10, cy: 10, r: 9, ...stroke }));
+  svg.appendChild(svgEl('line', { x1: 10, y1: 10, x2: 10, y2: 3, ...stroke }));     // minute hand, 12 o'clock
+  svg.appendChild(svgEl('line', { x1: 10, y1: 10, x2: 14.7, y2: 10, ...stroke }));  // hour hand, 3 o'clock
   return svg;
 }
 
-function makeBarIcon(slide) {
-  const ns = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(ns, 'svg');
-  svg.setAttribute('width', '30'); svg.setAttribute('height', '10');
-  svg.setAttribute('viewBox', '0 0 30 10');
-  const rect = document.createElementNS(ns, 'rect');
-  rect.setAttribute('x', '0'); rect.setAttribute('y', '0');
-  rect.setAttribute('width', '30'); rect.setAttribute('height', '10');
-  rect.setAttribute('rx', '2');
-  rect.setAttribute('stroke', '#c8c8c8'); rect.setAttribute('stroke-width', '1.5'); rect.setAttribute('fill', 'none');
-  svg.appendChild(rect);
-  const fill = document.createElementNS(ns, 'rect');
-  fill.setAttribute('x', '2'); fill.setAttribute('y', '2');
-  fill.setAttribute('width', '10'); fill.setAttribute('height', '6');
-  fill.setAttribute('rx', '1'); fill.setAttribute('fill', '#c8c8c8');
-  svg.appendChild(fill);
+function makeBarIcon() {
+  const svg = svgEl('svg', { class: 'icon-bar', viewBox: '0 0 28 7' });
+  svg.appendChild(svgEl('rect', { x: 0.5, y: 0.5, width: 27, height: 6, rx: 2,
+                                  stroke: '#c8c8c8', 'stroke-width': '1', fill: 'none' }));
+  svg.appendChild(svgEl('rect', { x: 1, y: 1, width: 9, height: 5, rx: 1, fill: '#c8c8c8' }));
   return svg;
 }
 
@@ -971,14 +978,14 @@ function handleKey(e) {
 
   if (mode === 'goto') {
     if (key === 'Enter')     { confirmGoto(); return true; }
-    if (key === 'Escape')    { enterPresentMode(); return true; }
-    if (key === 'Backspace') { gotoText = gotoText.slice(0, -1); gotoDisplay.textContent = gotoText + '\u2502'; return true; }
-    if (/^\d$/.test(key))    { gotoText += key; gotoDisplay.textContent = gotoText + '\u2502'; return true; }
+    if (key === 'Escape')    { closeOverlay(); return true; }
+    if (key === 'Backspace') { gotoText = gotoText.slice(0, -1); gotoTextEl.textContent = gotoText; return true; }
+    if (/^\d$/.test(key))    { gotoText += key; gotoTextEl.textContent = gotoText; return true; }
     return false;
   }
 
   if (mode === 'help') {
-    enterPresentMode();
+    closeOverlay();
     return true;
   }
 
@@ -989,8 +996,12 @@ function handleKey(e) {
     if (key === 'ArrowLeft') { overviewMoveLeft();  return true; }
     if (key === 'ArrowDown') { overviewMoveDown();  return true; }
     if (key === 'ArrowUp')   { overviewMoveUp();    return true; }
+    if (key === 'Home') { selectOverview(0, true); return true; }
+    if (key === 'End')  { selectOverview(SLIDES.length - 1, true); return true; }
+    if (key.toLowerCase() === 'g') { enterGotoMode(); return true; }
+    if (key.toLowerCase() === 'h' || key === 'F1' || key === '?') { enterHelpMode(); return true; }
     if (key.toLowerCase() === 'f' || key === 'F11') { toggleFullscreen(); return true; }
-    if (key.toLowerCase() === 'q') { window.close(); return true; }
+    if (key.toLowerCase() === 'q') { quit(); return true; }
     return false;
   }
 
@@ -1027,7 +1038,7 @@ function handleKey(e) {
   if (key === 'Tab' || key.toLowerCase() === 'o') { enterOverviewMode(); return true; }
   if (key.toLowerCase() === 'h' || key === 'F1' || key === '?') { enterHelpMode(); return true; }
   if (key.toLowerCase() === 'f' || key === 'F11') { toggleFullscreen(); return true; }
-  if (key.toLowerCase() === 'q' || key === 'Escape') { window.close(); return true; }
+  if (key.toLowerCase() === 'q' || key === 'Escape') { quit(); return true; }
 
   return false;
 }
@@ -1043,6 +1054,13 @@ presentView.addEventListener('contextmenu', (e) => {
   prevSlide();
 });
 
+// ── Quit ───────────────────────────────────────────────────────────────────
+// A browser tab can't quit itself (window.close only works on script-opened
+// tabs), so the most "quit" can do is leave fullscreen.
+function quit() {
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+}
+
 // ── Fullscreen ─────────────────────────────────────────────────────────────
 function toggleFullscreen() {
   if (!document.fullscreenElement) {
@@ -1053,7 +1071,7 @@ function toggleFullscreen() {
 }
 
 // ── Help overlay click to dismiss ──────────────────────────────────────────
-helpOverlay.addEventListener('click', () => enterPresentMode());
+helpOverlay.addEventListener('click', () => closeOverlay());
 
 // ── Init: preload all images then start ────────────────────────────────────
 (function preload() {

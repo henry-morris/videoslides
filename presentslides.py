@@ -125,6 +125,7 @@ class Presenter:
         self.mode = self.MODE_PRESENT
         self.blank = None  # None | "black" | "white"
         self.goto_text = ""
+        self._overlay_return = self.MODE_PRESENT  # mode help/goto go back to
         self.running = True
         self.fullscreen = True
         self.show_info = False
@@ -231,6 +232,18 @@ class Presenter:
         self.mode = self.MODE_PRESENT
         if self.fullscreen:
             pygame.mouse.set_visible(False)
+
+    def _open_overlay(self, mode):
+        """Show help or goto on top of the current mode (present or overview)."""
+        self._overlay_return = self.mode
+        self.mode = mode
+
+    def _close_overlay(self):
+        """Dismiss help or goto, returning to whatever was underneath."""
+        if self._overlay_return == self.MODE_OVERVIEW:
+            self.mode = self.MODE_OVERVIEW
+        else:
+            self._enter_present_mode()
 
     def _end_time_remaining(self, slide):
         """Seconds remaining until the slide's 'until' time, or None if not set."""
@@ -342,7 +355,7 @@ class Presenter:
         if self.mode == self.MODE_GOTO:
             self._key_goto(event)
         elif self.mode == self.MODE_HELP:
-            self._enter_present_mode()
+            self._close_overlay()
         elif self.mode == self.MODE_OVERVIEW:
             self._key_overview(event)
         else:
@@ -385,8 +398,8 @@ class Presenter:
 
         # Goto
         elif key == pygame.K_g:
-            self.mode = self.MODE_GOTO
             self.goto_text = ""
+            self._open_overlay(self.MODE_GOTO)
 
         # Overview
         elif key in (pygame.K_TAB, pygame.K_o):
@@ -405,7 +418,7 @@ class Presenter:
 
         # Help
         elif key in (pygame.K_h, pygame.K_F1) or uni == "?":
-            self.mode = self.MODE_HELP
+            self._open_overlay(self.MODE_HELP)
 
         # Blank
         elif key == pygame.K_b:
@@ -625,6 +638,7 @@ class Presenter:
 
     def _key_overview(self, event):
         key = event.key
+        uni = event.unicode
         cols = OVERVIEW_COLS
 
         if key in (pygame.K_ESCAPE, pygame.K_TAB, pygame.K_o):
@@ -681,6 +695,17 @@ class Presenter:
                 if new_idx is not None:
                     self.overview_selected = new_idx
             self._overview_ensure_visible()
+        elif key == pygame.K_HOME:
+            self.overview_selected = 0
+            self._overview_ensure_visible()
+        elif key == pygame.K_END:
+            self.overview_selected = len(self.slides) - 1
+            self._overview_ensure_visible()
+        elif key == pygame.K_g:
+            self.goto_text = ""
+            self._open_overlay(self.MODE_GOTO)
+        elif key in (pygame.K_h, pygame.K_F1) or uni == "?":
+            self._open_overlay(self.MODE_HELP)
         elif key in (pygame.K_f, pygame.K_F11):
             self.toggle_fullscreen()
         elif key == pygame.K_q:
@@ -697,7 +722,7 @@ class Presenter:
                 pass
             self._enter_present_mode()
         elif key == pygame.K_ESCAPE:
-            self._enter_present_mode()
+            self._close_overlay()
         elif key == pygame.K_BACKSPACE:
             self.goto_text = self.goto_text[:-1]
         elif event.unicode.isdigit():
@@ -705,7 +730,7 @@ class Presenter:
 
     def _on_click(self, event):
         if self.mode == self.MODE_HELP:
-            self._enter_present_mode()
+            self._close_overlay()
         elif self.mode == self.MODE_OVERVIEW:
             self._click_overview(event)
         else:
@@ -876,12 +901,15 @@ class Presenter:
             self._draw_presentation_overlays()
         elif self.mode == self.MODE_OVERVIEW:
             self._draw_overview()
-        elif self.mode == self.MODE_HELP:
-            self._draw_presentation()
-            self._draw_help_overlay()
-        elif self.mode == self.MODE_GOTO:
-            self._draw_presentation()
-            self._draw_goto_overlay()
+        elif self.mode in (self.MODE_HELP, self.MODE_GOTO):
+            if self._overlay_return == self.MODE_OVERVIEW:
+                self._draw_overview()
+            else:
+                self._draw_presentation()
+            if self.mode == self.MODE_HELP:
+                self._draw_help_overlay()
+            else:
+                self._draw_goto_overlay()
         pygame.display.flip()
 
     def _draw_slide_base(self):
@@ -1176,7 +1204,8 @@ class Presenter:
             cx = x + tw // 2 if centered else x + tw - MARGIN - CLOCK_R
             cy = label_cy
             pygame.draw.circle(self.screen, COLOR, (cx, cy), CLOCK_R, 2)
-            for angle_deg, length in [(-60, 0.52), (0, 0.78)]:
+            # Hands at 12 and 3 so it reads as a clock, not a tick
+            for angle_deg, length in [(0, 0.78), (90, 0.52)]:
                 rad = math.radians(angle_deg)
                 ex = cx + int(CLOCK_R * length * math.sin(rad))
                 ey = cy - int(CLOCK_R * length * math.cos(rad))
@@ -1212,6 +1241,12 @@ class Presenter:
             ("item", "F / F11", "Toggle fullscreen"),
             ("item", "Tab / O", "Slide overview"),
             ("item", "H / F1 / ?", "This help"),
+            ("blank", "", ""),
+            ("heading", "", "Overview"),
+            ("item", "Arrows", "Move selection"),
+            ("item", "Home / End", "First / last slide"),
+            ("item", "Enter", "Show selected slide"),
+            ("item", "Escape / Tab / O", "Back to presentation"),
             ("blank", "", ""),
             ("item", "Q / Escape", "Quit"),
             ("blank", "", ""),
