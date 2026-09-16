@@ -397,13 +397,10 @@ body {
   <div id="help-box">
     <div class="help-heading">Playback</div>
     <span class="help-key">Space / P</span><span class="help-desc">Pause / Play</span>
-    <span class="help-key">Right / Enter</span><span class="help-desc">Next slide</span>
-    <span class="help-key">Left / Backspace</span><span class="help-desc">Previous slide</span>
-    <span class="help-key">Home</span><span class="help-desc">First slide</span>
-    <span class="help-key">End</span><span class="help-desc">Last slide</span>
+    <span class="help-key">Right / Enter / Left click</span><span class="help-desc">Next slide</span>
+    <span class="help-key">Left / Backspace / Right click</span><span class="help-desc">Previous slide</span>
+    <span class="help-key">Home / End</span><span class="help-desc">First / last slide</span>
     <span class="help-key">G</span><span class="help-desc">Go to slide number</span>
-    <span class="help-key">Left click</span><span class="help-desc">Next slide</span>
-    <span class="help-key">Right click</span><span class="help-desc">Previous slide</span>
     <div class="help-blank"></div>
     <div class="help-heading">View</div>
     <span class="help-key">T</span><span class="help-desc">Toggle info bar</span>

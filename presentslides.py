@@ -355,7 +355,10 @@ class Presenter:
         if self.mode == self.MODE_GOTO:
             self._key_goto(event)
         elif self.mode == self.MODE_HELP:
-            self._close_overlay()
+            # Ignore bare modifier presses so Shift+/ (= ?) can toggle help closed
+            if event.key not in (pygame.K_LSHIFT, pygame.K_RSHIFT, pygame.K_LCTRL, pygame.K_RCTRL,
+                                 pygame.K_LALT, pygame.K_RALT, pygame.K_LMETA, pygame.K_RMETA):
+                self._close_overlay()
         elif self.mode == self.MODE_OVERVIEW:
             self._key_overview(event)
         else:
@@ -1226,13 +1229,10 @@ class Presenter:
         lines = [
             ("heading", "", "Playback"),
             ("item", "Space / P", "Pause / Play"),
-            ("item", "Right / Enter", "Next slide"),
-            ("item", "Left / Backspace", "Previous slide"),
-            ("item", "Home", "First slide"),
-            ("item", "End", "Last slide"),
+            ("item", "Right / Enter / Left click", "Next slide"),
+            ("item", "Left / Backspace / Right click", "Previous slide"),
+            ("item", "Home / End", "First / last slide"),
             ("item", "G", "Go to slide number"),
-            ("item", "Left click", "Next slide"),
-            ("item", "Right click", "Previous slide"),
             ("blank", "", ""),
             ("heading", "", "View"),
             ("item", "T", "Toggle info bar"),
