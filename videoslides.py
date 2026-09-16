@@ -57,14 +57,9 @@ def pngs_to_video(config):
     keyframe_seconds = config["settings"].get("keyframe_interval", 15)
     resolution = config["settings"].get("resolution", [1920, 1080])
 
-    output_ext = Path(output_filename).suffix.lstrip(".").upper()
-    print(f"🎥 Starting PNG → {output_ext} conversion...")
-
     clips = []
     for slide, pdf_cache_dir, total_pages, page_numbers in resolve_slides(config):
         duration = slide.get("duration", 15) or 15
-
-        print(f"🎬 Processing '{slide['filename']}' (duration={duration}s, pages={page_numbers})...")
 
         # Check if this slide should have a progress bar
         show_progress_bar = slide.get("show_progress_bar", False)
@@ -78,18 +73,10 @@ def pngs_to_video(config):
                 print(f"⚠️ Page {page_num} not found in cache for '{slide['filename']}', skipping")
                 continue
 
-            print(f"🎞️ Adding page {page_num} ({duration}s)")
             clip = ImageClip(str(cached_png)).with_duration(duration)
-
-            # For long slides, note that keyframes will be added during encoding
-            if duration > keyframe_seconds:
-                keyframe_count = duration // keyframe_seconds + 1
-                print(f"🔑 Long slide detected - will add ~{keyframe_count} keyframes during encoding")
 
             # Add progress bar to this clip if requested
             if show_progress_bar:
-                print(f"🎯 Adding progress bar to page {page_num}...")
-
                 # Create progress bar for this clip
                 progress_bar = create_progress_bar_clip(
                     width=resolution[0],
@@ -108,7 +95,7 @@ def pngs_to_video(config):
             clips.append(clip)
 
     if clips:
-        print(f"🔧 Creating video with {len(clips)} slides...")
+        print(f"🎥 Encoding {len(clips)} slides to '{output_filename}'...")
         final = concatenate_videoclips(clips, method="compose")
 
         # Set codec and keyframe interval based on format
@@ -142,19 +129,14 @@ def main():
     os.chdir(args.directory)
 
     try:
-        print(f"🚀 Starting VideoSlides pipeline in '{os.getcwd()}'...")
-
         # Load configuration
         config = load_config(args.config)
-        print(f"📋 Loaded config from '{args.config}'\n")
 
         # Stage 1: Convert PDFs to PNGs using config
         prepare_slide_images(config)
 
         # Stage 2: Convert PNGs to video
         pngs_to_video(config)
-
-        print("\n🎬 VideoSlides pipeline complete!")
 
     finally:
         # Return to original directory

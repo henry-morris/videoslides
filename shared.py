@@ -228,22 +228,15 @@ def pdfs_to_pngs(config, target_width=1920, target_height=1080):
 
     background_color = config["settings"].get("background_color", "black")
 
-    print("🧩 Starting PDF → PNG conversion from config...")
-
-    for order, slide in enumerate(config["slides"], start=1):
+    seen = set()
+    for slide in config["slides"]:
         filename = slide["filename"]
-        duration = slide.get("duration", 15) or 15
         pages_spec = slide.get("pages", "all")
-        is_image = Path(filename).suffix.lower() == ".png"
 
         pdf_file = Path(filename)
         if not pdf_file.exists():
             print(f"⚠️ Skipping '{filename}' - file not found")
             continue
-
-        kind = "image" if is_image else "PDF"
-        pages_info = "" if is_image else f", pages={pages_spec}"
-        print(f"\n📄 Processing '{filename}' ({kind}, order={order}, duration={duration}s{pages_info})...")
 
         # Calculate PDF hash for caching
         pdf_hash = calculate_pdf_hash(pdf_file)
@@ -253,23 +246,20 @@ def pdfs_to_pngs(config, target_width=1920, target_height=1080):
         # Check if we need to render pages
         total_pages = get_cached_page_count(pdf_cache_dir)
         if total_pages is not None:
-            # Cache exists with pages
-            print(f"📦 Found cache for '{filename}' (hash: {pdf_hash[:8]}...) with {total_pages} pages")
+            if pdf_hash not in seen:
+                print(f"📦 '{filename}' ({total_pages} page{'s' if total_pages != 1 else ''}, cached)")
         else:
             # No cache, need to render all pages
-            print(f"🆕 No cache found, rendering all pages for '{filename}' (hash: {pdf_hash[:8]}...)")
-
-            # Create temporary directory
             pdf_temp_dir.mkdir(exist_ok=True)
 
             doc = fitz.open(pdf_file)
             total_pages = len(doc)
-            print(f"🔄 Rendering {total_pages} page(s)...")
+            print(f"🔄 Rendering '{filename}' ({total_pages} page{'s' if total_pages != 1 else ''}) ", end="", flush=True)
 
             bg_rgb = parse_color(background_color)
 
             for page_idx in range(total_pages):
-                print(f"🔧 Rendering page {page_idx + 1}/{total_pages}...")
+                print(".", end="", flush=True)
                 page = doc[page_idx]
 
                 # Scale to fit within target while preserving aspect ratio
@@ -282,25 +272,15 @@ def pdfs_to_pngs(config, target_width=1920, target_height=1080):
                 pix.save(str(temp_png))
 
             doc.close()
+            print()
 
             # Atomically move temporary directory to final location
             pdf_temp_dir.rename(pdf_cache_dir)
-            print(f"✅ Cache created for '{filename}' with {total_pages} pages")
+        seen.add(pdf_hash)
 
-        # Parse which pages to include for this slide
-        page_numbers = parse_page_range(pages_spec, total_pages)
-        print(f"📋 Using pages: {page_numbers}")
-
-        # Verify all requested pages exist in cache
-        for page_num in page_numbers:
+        # Warn about requested pages that don't exist
+        for page_num in parse_page_range(pages_spec, total_pages):
             if page_num > total_pages:
-                print(f"⚠️ Page {page_num} doesn't exist in {filename}, skipping")
-                continue
-
-            cached_png = pdf_cache_dir / f"{page_num:03d}.png"
-            if not cached_png.exists():
+                print(f"⚠️ Page {page_num} doesn't exist in '{filename}', skipping")
+            elif not (pdf_cache_dir / f"{page_num:03d}.png").exists():
                 print(f"⚠️ Page {page_num} missing from cache for '{filename}'")
-            else:
-                print(f"✅ Page {page_num} ready")
-
-    print(f"\n🎬 PNG conversion complete! Slides saved in '{cache_root.resolve()}'")

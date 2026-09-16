@@ -985,6 +985,8 @@ function handleKey(e) {
   }
 
   if (mode === 'help') {
+    // Ignore bare modifier presses so Shift+/ (= ?) can toggle help closed
+    if (['Shift', 'Control', 'Alt', 'Meta'].includes(key)) return false;
     closeOverlay();
     return true;
   }
