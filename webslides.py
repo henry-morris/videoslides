@@ -172,14 +172,14 @@ body {
   width: 0%;
 }
 
-/* Countdown: FONT_SIZE_COUNTDOWN 36, bar = text + 16 */
+/* Countdown: FONT_SIZE_COUNTDOWN 72, bar = text + 16 */
 #countdown-bar {
   position: absolute;
   bottom: 0; left: 0; right: 0;
   background: rgba(0,0,0,0.55);
   padding: calc(8 * var(--px)) 0;
   text-align: center;
-  font-size: calc(36 * var(--px));
+  font-size: calc(72 * var(--px));
   line-height: 1.17;
   color: #fff;
   text-shadow: 1px 1px 0 #000;

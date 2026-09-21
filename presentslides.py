@@ -39,7 +39,7 @@ OVERVIEW_HEADING_H = 75
 FONT_SIZE_INFO = 24
 FONT_SIZE_HELP = 20
 FONT_SIZE_BIG = 48
-FONT_SIZE_COUNTDOWN = 36
+FONT_SIZE_COUNTDOWN = 72
 FONT_SIZE_SECTION = 30
 
 # Default progress bar style (used when slides don't specify their own)
