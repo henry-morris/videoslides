@@ -177,8 +177,9 @@ def load_config(config_file="config.toml"):
     KNOWN_SLIDE_KEYS = {
         "filename", "duration", "until", "pages", "title", "slug",
         "show_page_number", "show_progress_bar", "show_countdown",
-        "progress_bar_color", "progress_bar_height",
+        "progress_bar_color", "progress_bar_height", "countdown_text",
     }
+    COUNTDOWN_TEXT_KEYS = {"text", "font_file", "size", "x", "y", "color"}
 
     for key in config.get("settings", {}):
         if key not in KNOWN_SETTINGS:
@@ -208,6 +209,23 @@ def load_config(config_file="config.toml"):
 
         if "duration" in slide and slide["duration"] < 0:
             raise RuntimeError(f"{label}: 'duration' must be non-negative, got {slide['duration']!r}")
+
+        if "countdown_text" in slide:
+            ct = slide["countdown_text"]
+            if not isinstance(ct, dict):
+                raise RuntimeError(f"{label}: 'countdown_text' must be a table")
+            for key in ct:
+                if key not in COUNTDOWN_TEXT_KEYS:
+                    raise RuntimeError(f"{label}: unknown countdown_text option '{key}'")
+            for key in ("text", "font_file"):
+                if key not in ct:
+                    raise RuntimeError(f"{label}: countdown_text needs '{key}'")
+            if not Path(ct["font_file"]).is_file():
+                raise RuntimeError(f"{label}: countdown_text font '{ct['font_file']}' not found")
+            if slide.get("show_countdown"):
+                raise RuntimeError(f"{label}: 'countdown_text' and 'show_countdown' are mutually exclusive")
+            if "until" not in slide and slide.get("duration", 0) <= 0:
+                raise RuntimeError(f"{label}: 'countdown_text' needs 'until' or a 'duration' to count down")
 
     return config
 

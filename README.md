@@ -133,6 +133,36 @@ Each `[[slides]]` entry supports:
 | `progress_bar_color` | white (presenter) / `#1f4305` (video) | Bar color, hex or named |
 | `progress_bar_height` | `6` (presenter) / `16` (video) | Bar height in pixels |
 | `show_countdown` | `false` | Show time remaining centred at the bottom instead of a progress bar (presentslides) |
+| `countdown_text` | *(none)* | Time remaining as text placed on the slide, set out below. Needs `until` or `duration`; mutually exclusive with `show_countdown`. (webslides) |
+
+### Countdown Text
+
+A sub-table on a slide puts a line of text on top of it, in a font of your
+choosing, counting down the minutes:
+
+```toml
+[[slides]]
+filename = "break.pdf"
+until = "19:45"
+[slides.countdown_text]
+text = "Talks start again in {minutes}"   # "12 minutes", then "1 minute"
+font_file = "../fonts/Inter-BoldItalic.woff2"
+size = 100          # font size in slide pixels
+x = 960             # top-left of the text box, in slide pixels
+y = 108
+color = "#563711"
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `text` | *(required)* | Wording; `{minutes}` is replaced with the minutes left, rounded up |
+| `font_file` | *(required)* | Font file (woff2, woff, ttf or otf), relative to the config's directory. It is embedded in the HTML, so it works offline. |
+| `size` | `72` | Font size, in pixels of the slide at `resolution` |
+| `x`, `y` | `0` | Top-left of the text box, in slide pixels. The box is 1.46 lines tall, as in a Canva PDF export, so the coordinates of a text box in the slide's design carry over. |
+| `color` | `#fff` | Text colour, hex or named |
+
+The text does not wrap or shrink to fit: if it runs off the slide, change the
+size, position or wording.
 
 ### Page Range Syntax
 

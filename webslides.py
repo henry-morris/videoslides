@@ -10,6 +10,7 @@
 """Export a VideoSlides presentation as a static web site."""
 
 import argparse
+import base64
 import json
 import os
 import shutil
@@ -44,6 +45,7 @@ def build_slide_list(config):
         slug = prev_slug
         show_page_number = slide_cfg.get("show_page_number", False)
         show_countdown = slide_cfg.get("show_countdown", False)
+        countdown_text = slide_cfg.get("countdown_text", None)
 
         for page_num in page_numbers:
             cached_png = pdf_cache_dir / f"{page_num:03d}.png"
@@ -58,6 +60,7 @@ def build_slide_list(config):
                     "slug": slug,
                     "show_page_number": show_page_number,
                     "show_countdown": show_countdown,
+                    "countdown_text": countdown_text,
                     "until": until,
                     "page": page_num,
                     "total_pages": total_pages,
@@ -98,6 +101,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Presentation</title>
 <style>
+__FONT_FACES__
 /* Sizes mirror presentslides.py, which lays out in pixels on a 1920-wide
    screen. --px is one of those pixels, so the two look identical at 1920 and
    the web version scales proportionally in smaller windows. */
@@ -184,6 +188,28 @@ body {
   color: #fff;
   text-shadow: 1px 1px 0 #000;
   pointer-events: none;
+  display: none;
+}
+
+/* Countdown text: placed on the slide in slide pixels, so it sits in a frame
+   that tracks the letterboxed image rather than the window. Position and size
+   are set per slide from the config. */
+#slide-frame {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: min(100vw, calc(100vh * __FRAME_W__ / __FRAME_H__));
+  aspect-ratio: __FRAME_W__ / __FRAME_H__;
+  container-type: inline-size;
+  pointer-events: none;
+}
+/* line-height 1.46 puts the box where Canva's PDF export puts a text box:
+   Break on 007's break slide, placed at its PDF coordinates in Inter 3.3,
+   lands on the slide's own to the pixel. Measured for Inter only. */
+#countdown-text {
+  position: absolute;
+  white-space: nowrap;
+  line-height: 1.46;
   display: none;
 }
 
@@ -381,6 +407,7 @@ body {
   <div id="progress-bar-wrap">
     <div id="progress-bar-fill"></div>
   </div>
+  <div id="slide-frame"><div id="countdown-text"></div></div>
   <div id="countdown-bar"></div>
   <div id="info-bar">
     <div id="info-left"></div>
@@ -470,6 +497,7 @@ const infoRight     = document.getElementById('info-right');
 const progressWrap  = document.getElementById('progress-bar-wrap');
 const progressFill  = document.getElementById('progress-bar-fill');
 const countdownBar  = document.getElementById('countdown-bar');
+const countdownText = document.getElementById('countdown-text');
 const gotoLabel     = document.getElementById('goto-label');
 const gotoTextEl   = document.getElementById('goto-text');
 
@@ -636,6 +664,14 @@ function renderPresent() {
     progressFill.style.background = progressBarStyle.color;
     progressFill.style.height = progressBarStyle.height;
   }
+  const ct = slide.countdown_text;
+  if (ct) {
+    countdownText.style.fontFamily = ct.font;
+    countdownText.style.fontSize = ct.size + 'cqw';
+    countdownText.style.left = ct.x + '%';
+    countdownText.style.top = ct.y + '%';
+    countdownText.style.color = ct.color;
+  }
   updateOverlays();
 }
 
@@ -662,6 +698,21 @@ function updateOverlays() {
     }
   } else {
     countdownBar.style.display = 'none';
+  }
+
+  // Countdown text: "{minutes}" reads "12 minutes", then "1 minute" in the last
+  if (slide.countdown_text) {
+    const mins = Math.ceil(slideRemaining(slide) / 60);
+    if (mins > 0) {
+      const words = mins === 1 ? '1 minute' : `${mins} minutes`;
+      const text = slide.countdown_text.text.replaceAll('{minutes}', words);
+      if (countdownText.textContent !== text) countdownText.textContent = text;
+      countdownText.style.display = 'block';
+    } else {
+      countdownText.style.display = 'none';
+    }
+  } else {
+    countdownText.style.display = 'none';
   }
 
   // Info bar
@@ -1121,6 +1172,53 @@ def default_bar_color_css(bar_color):
     return bar_color
 
 
+def countdown_fonts(slides_raw, width, height):
+    """Turn each slide's countdown_text into what the page needs.
+
+    Returns ({slide index: settings for the JS}, {font file: family name}).
+    Position and size become percentages of the slide, so the text scales with
+    the image; each font file gets one family name, embedded once per page.
+    """
+    families = {}
+    settings = {}
+    for i, slide in enumerate(slides_raw):
+        ct = slide.get("countdown_text")
+        if not ct:
+            continue
+        font_file = ct["font_file"]
+        family = families.setdefault(font_file, f"countdown{len(families)}")
+        settings[i] = {
+            "text": ct["text"],
+            "font": f"'{family}', sans-serif",
+            "size": ct.get("size", 72) / width * 100,
+            "x": ct.get("x", 0) / width * 100,
+            "y": ct.get("y", 0) / height * 100,
+            "color": ct.get("color", "#fff"),
+        }
+    return settings, families
+
+
+def font_faces(slide_data, families):
+    """@font-face rules for the fonts this page's slides use, inlined."""
+    used = {s["countdown_text"]["font"] for s in slide_data if s["countdown_text"]}
+    rules = []
+    for font_file, family in families.items():
+        if f"'{family}', sans-serif" not in used:
+            continue
+        mime = {".woff2": "font/woff2", ".woff": "font/woff", ".otf": "font/otf"}.get(
+            Path(font_file).suffix.lower(), "font/ttf")
+        data = base64.b64encode(Path(font_file).read_bytes()).decode("ascii")
+        rules.append(f"@font-face {{ font-family: '{family}'; src: url(data:{mime};base64,{data}); }}")
+    return "\n".join(rules)
+
+
+def render_html(slide_data, sections, families, width, height):
+    html = HTML_TEMPLATE.replace("__SLIDES_DATA__", json.dumps(slide_data, indent=2))
+    html = html.replace("__SECTIONS_DATA__", json.dumps(sections, indent=2))
+    html = html.replace("__FRAME_W__", str(width)).replace("__FRAME_H__", str(height))
+    return html.replace("__FONT_FACES__", font_faces(slide_data, families))
+
+
 def export(config, output_dir: Path):
     slides_raw = build_slide_list(config)
     if not slides_raw:
@@ -1130,6 +1228,9 @@ def export(config, output_dir: Path):
     # Create output/slides directory
     slides_out = output_dir / "slides"
     slides_out.mkdir(parents=True, exist_ok=True)
+
+    width, height = config["settings"].get("resolution", [1920, 1080])
+    countdown_settings, families = countdown_fonts(slides_raw, width, height)
 
     # Copy PNGs with sequential names
     slide_data = []
@@ -1146,6 +1247,7 @@ def export(config, output_dir: Path):
             "bar_color": default_bar_color_css(slide["bar_color"]),
             "bar_height": slide["bar_height"] or 16,
             "show_countdown": slide["show_countdown"],
+            "countdown_text": countdown_settings.get(i),
             "title": slide["title"],
             "show_page_number": slide["show_page_number"],
             "page": slide["page"],
@@ -1155,8 +1257,7 @@ def export(config, output_dir: Path):
     sections = build_sections(slides_raw)
 
     # Embed data into HTML
-    html = HTML_TEMPLATE.replace("__SLIDES_DATA__", json.dumps(slide_data, indent=2))
-    html = html.replace("__SECTIONS_DATA__", json.dumps(sections, indent=2))
+    html = render_html(slide_data, sections, families, width, height)
 
     index_path = output_dir / "index.html"
     index_path.write_text(html, encoding="utf-8")
@@ -1179,8 +1280,7 @@ def export(config, output_dir: Path):
         raw_subset = [p[0] for p in pairs]
         data_subset = [dict(p[1], src="../" + p[1]["src"]) for p in pairs]
         sub_sections = build_sections(raw_subset)
-        sub_html = HTML_TEMPLATE.replace("__SLIDES_DATA__", json.dumps(data_subset, indent=2))
-        sub_html = sub_html.replace("__SECTIONS_DATA__", json.dumps(sub_sections, indent=2))
+        sub_html = render_html(data_subset, sub_sections, families, width, height)
         slug_dir = output_dir / slug
         slug_dir.mkdir(parents=True, exist_ok=True)
         (slug_dir / "index.html").write_text(sub_html, encoding="utf-8")
