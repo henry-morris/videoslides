@@ -179,7 +179,7 @@ def load_config(config_file="config.toml"):
         "show_page_number", "show_progress_bar", "show_countdown",
         "progress_bar_color", "progress_bar_height", "countdown_text",
     }
-    COUNTDOWN_TEXT_KEYS = {"text", "font_file", "size", "x", "y", "color"}
+    COUNTDOWN_TEXT_KEYS = {"text", "font_file", "size", "x", "y", "color", "line_spacing", "numbers"}
 
     for key in config.get("settings", {}):
         if key not in KNOWN_SETTINGS:
@@ -220,6 +220,11 @@ def load_config(config_file="config.toml"):
             for key in ("text", "font_file"):
                 if key not in ct:
                     raise RuntimeError(f"{label}: countdown_text needs '{key}'")
+            if ct.get("numbers", "digits") not in ("digits", "words"):
+                raise RuntimeError(f"{label}: countdown_text 'numbers' must be \"digits\" or \"words\", got {ct['numbers']!r}")
+            spacing = ct.get("line_spacing", 1.4)
+            if isinstance(spacing, bool) or not isinstance(spacing, (int, float)) or spacing <= 0:
+                raise RuntimeError(f"{label}: countdown_text 'line_spacing' must be a positive number, got {spacing!r}")
             if not Path(ct["font_file"]).is_file():
                 raise RuntimeError(f"{label}: countdown_text font '{ct['font_file']}' not found")
             if slide.get("show_countdown"):

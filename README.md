@@ -137,32 +137,44 @@ Each `[[slides]]` entry supports:
 
 ### Countdown Text
 
-A sub-table on a slide puts a line of text on top of it, in a font of your
-choosing, counting down the minutes:
+A sub-table on a slide puts text on top of it, in a font of your choosing,
+counting down the minutes:
 
 ```toml
 [[slides]]
 filename = "break.pdf"
 until = "19:45"
 [slides.countdown_text]
-text = "Talks start again in {minutes}"   # "12 minutes", then "1 minute"
-font_file = "../fonts/Inter-BoldItalic.woff2"
-size = 100          # font size in slide pixels
+text = "Next three talks start\nin {minutes}"   # "in twelve minutes", then "in one minute"
+numbers = "words"
+font_file = "../fonts/Inter-Italic.woff2"
+size = 80           # font size in slide pixels
 x = 960             # top-left of the text box, in slide pixels
-y = 108
+y = 666.8
+line_spacing = 1.4
 color = "#563711"
 ```
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `text` | *(required)* | Wording; `{minutes}` is replaced with the minutes left, rounded up |
+| `text` | *(required)* | Wording; `{minutes}` is replaced with the minutes left, rounded up ("12 minutes", then "1 minute"). `\n` starts a new line. |
+| `numbers` | `digits` | `words` spells the minutes out: "twelve minutes", "one minute". Words go up to ninety-nine, digits beyond. |
 | `font_file` | *(required)* | Font file (woff2, woff, ttf or otf), relative to the config's directory. It is embedded in the HTML, so it works offline. |
 | `size` | `72` | Font size, in pixels of the slide at `resolution` |
-| `x`, `y` | `0` | Top-left of the text box, in slide pixels. The box is 1.46 lines tall, as in a Canva PDF export, so the coordinates of a text box in the slide's design carry over. |
+| `x`, `y` | `0` | Top-left of the text box, in slide pixels, as a Canva PDF export places it: `y` is the font's ascender line, the top of the box PyMuPDF reports for the text. |
+| `line_spacing` | `1.4` | Baseline to baseline, in font sizes, as Canva's "Line spacing" |
 | `color` | `#fff` | Text colour, hex or named |
 
+To match text in a Canva design, read its position and size from the PDF with
+PyMuPDF (`page.get_text("dict")`, span `bbox` and `size`) and multiply by
+4/3: Canva sizes are points on a 1440pt page, the slide is 1920px. Placement
+is exact for fonts with no line gap, as Inter.
+
+When the time runs out the text disappears and, as on any timed slide, the
+show moves to the next slide.
+
 The text does not wrap or shrink to fit: if it runs off the slide, change the
-size, position or wording.
+size, position or wording, or break the line with `\n`.
 
 ### Page Range Syntax
 

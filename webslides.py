@@ -203,14 +203,18 @@ body {
   container-type: inline-size;
   pointer-events: none;
 }
-/* line-height 1.46 puts the box where Canva's PDF export puts a text box:
-   Break on 007's break slide, placed at its PDF coordinates in Inter 3.3,
-   lands on the slide's own to the pixel. Measured for Inter only. */
+/* Placed as a Canva PDF places text: the box top is the font's ascender line,
+   and baselines are line_spacing font sizes apart. line-height: normal makes
+   each line exactly ascender-to-descender tall (exact for fonts with no line
+   gap, as Inter); each line is a block --line-spacing ems tall. */
 #countdown-text {
   position: absolute;
-  white-space: nowrap;
-  line-height: 1.46;
+  white-space: pre;
+  line-height: normal;
   display: none;
+}
+#countdown-text > div {
+  height: calc(var(--line-spacing) * 1em);
 }
 
 /* ── Overview mode ──
@@ -502,6 +506,17 @@ const gotoLabel     = document.getElementById('goto-label');
 const gotoTextEl   = document.getElementById('goto-text');
 
 // ── Helpers ────────────────────────────────────────────────────────────────
+// 1-99 in words, "twelve", "forty-five"; digits beyond
+function numberWords(n) {
+  const ones = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
+    'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen',
+    'eighteen', 'nineteen'];
+  const tens = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+  if (n < 20) return ones[n];
+  if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 ? '-' + ones[n % 10] : '');
+  return String(n);
+}
+
 function formatDuration(secs) {
   secs = Math.max(0, Math.round(secs));
   if (secs >= 60) {
@@ -671,6 +686,7 @@ function renderPresent() {
     countdownText.style.left = ct.x + '%';
     countdownText.style.top = ct.y + '%';
     countdownText.style.color = ct.color;
+    countdownText.style.setProperty('--line-spacing', ct.line_spacing);
   }
   updateOverlays();
 }
@@ -700,13 +716,22 @@ function updateOverlays() {
     countdownBar.style.display = 'none';
   }
 
-  // Countdown text: "{minutes}" reads "12 minutes", then "1 minute" in the last
+  // Countdown text: "{minutes}" reads "12 minutes", then "1 minute" in the last;
+  // "twelve minutes" and "one minute" with numbers = "words"
   if (slide.countdown_text) {
     const mins = Math.ceil(slideRemaining(slide) / 60);
     if (mins > 0) {
-      const words = mins === 1 ? '1 minute' : `${mins} minutes`;
+      const n = slide.countdown_text.words ? numberWords(mins) : String(mins);
+      const words = mins === 1 ? `${n} minute` : `${n} minutes`;
       const text = slide.countdown_text.text.replaceAll('{minutes}', words);
-      if (countdownText.textContent !== text) countdownText.textContent = text;
+      if (countdownText.dataset.text !== text) {
+        countdownText.dataset.text = text;
+        countdownText.replaceChildren(...text.split('\n').map(line => {
+          const div = document.createElement('div');
+          div.textContent = line;
+          return div;
+        }));
+      }
       countdownText.style.display = 'block';
     } else {
       countdownText.style.display = 'none';
@@ -1194,6 +1219,8 @@ def countdown_fonts(slides_raw, width, height):
             "x": ct.get("x", 0) / width * 100,
             "y": ct.get("y", 0) / height * 100,
             "color": ct.get("color", "#fff"),
+            "line_spacing": ct.get("line_spacing", 1.4),
+            "words": ct.get("numbers", "digits") == "words",
         }
     return settings, families
 
