@@ -752,6 +752,7 @@ function updateOverlays() {
   const leftParts = [];
   if (slide.title) leftParts.push(slide.title);
   if (slide.show_page_number) leftParts.push(`${slide.page}/${slide.total_pages}`);
+  if (slide.until) leftParts.push(`Until ${slide.until}`);
   const rem = slideRemaining(slide);
   if (rem > 0) leftParts.push(formatDuration(Math.ceil(rem)));
   infoLeft.textContent = leftParts.join('   ');
