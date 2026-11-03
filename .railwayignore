@@ -1,0 +1,11 @@
+*.pdf
+/output
+/__pycache__
+*.py
+*.toml
+*.lock
+/config-*.toml
+README.md
+LICENSE
+example-config.toml
+uv.lock
