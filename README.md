@@ -1,3 +1,14 @@
+# ⚠️ DEPRECATED — NOT MAINTAINED ⚠️
+
+> [!CAUTION]
+> ## **This repository is deprecated and is no longer maintained.**
+>
+> **The code has been inlined into
+> [henry-morris/landtalks-slides](https://github.com/henry-morris/landtalks-slides),
+> in its `videoslides/` directory. Make all changes there, not here.**
+
+---
+
 # VideoSlides
 
 Three tools for working with PDF presentations, sharing the same TOML config and cached slide images.
